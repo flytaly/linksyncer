@@ -3,12 +3,15 @@ package imagesync
 import (
 	"io/fs"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
 var excludedDirs = map[string]bool{"node_modules": true}
 
-func shouldSkip(name string) bool {
+var allowedExt = regexp.MustCompile("(?i)(.md|.html|.htm)$")
+
+func shouldSkipDir(name string) bool {
 	if name == "." {
 		return false
 	}
@@ -20,16 +23,22 @@ func FileList(fileSystem fs.FS, path string) ([]string, error) {
 	var files []string
 
 	err := fs.WalkDir(fileSystem, path, func(path string, d fs.DirEntry, err error) error {
+		name := d.Name()
+
 		if err != nil {
 			return err
 		}
 
 		// skip hidden and some other dirs
-		if d.IsDir() && shouldSkip(d.Name()) {
+		if d.IsDir() && shouldSkipDir(name) {
 			return filepath.SkipDir
 		}
 
-		if d.IsDir() || d.Name() == "." {
+		if d.IsDir() || name == "." {
+			return nil
+		}
+
+		if !allowedExt.MatchString(name) {
 			return nil
 		}
 
