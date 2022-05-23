@@ -16,5 +16,15 @@ func main() {
 
 	files, _ := imagesync.FileList(os.DirFS(root), ".")
 
-	fmt.Println(files)
+	for _, v := range files {
+		images, err := imagesync.GetImagesFromFile(os.DirFS(root), v)
+
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		fmt.Printf("%v images %v\n", v, images)
+	}
+
 }

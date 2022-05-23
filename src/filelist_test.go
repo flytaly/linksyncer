@@ -1,7 +1,6 @@
 package imagesync
 
 import (
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -43,6 +42,4 @@ func TestFileList(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
-
-	fmt.Println(got)
 }

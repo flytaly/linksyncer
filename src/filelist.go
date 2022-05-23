@@ -1,6 +1,7 @@
 package imagesync
 
 import (
+	"errors"
 	"io/fs"
 	"path/filepath"
 	"regexp"
@@ -26,7 +27,10 @@ func FileList(fileSystem fs.FS, path string) ([]string, error) {
 		name := d.Name()
 
 		if err != nil {
-			return err
+			if errors.Is(err, fs.ErrPermission) {
+				return nil
+			}
+			return nil
 		}
 
 		// skip hidden and some other dirs
