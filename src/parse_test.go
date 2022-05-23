@@ -8,8 +8,9 @@ import (
 	"testing/fstest"
 )
 
-func getTestImages(root string) map[string]string {
-	j := filepath.Join
+var j = filepath.Join
+
+func mdImages(root string) map[string]string {
 	return map[string]string{
 		`![alt text](./assets/subfolder/image.png)`:                    j(root, "./assets/subfolder/image.png"),
 		`![alt text](assets/img2.jpeg "image title")`:                  j(root, "./assets/img2.jpeg"),
@@ -19,49 +20,91 @@ func getTestImages(root string) map[string]string {
 		`![alt text](../../outside_dir/img5.svg)`:                      j(root, "../../outside_dir/img5.svg"),
 		`![alt text](./non_latin/изображение.svg)`:                     j(root, "./non_latin/изображение.svg"),
 		`![alt text][imgid1] \n[imgid1]: assets/ref_image.png "title"`: j(root, "assets/ref_image.png"),
-		"[![video](./assets/name.png)](https://youtube.com)":           j(root, "./assets/name.png"),
-		// `<img src="assets/img1.webp" alt="alt text" style="zoom:50%;" />`: j(root, "./assets/img1.webp"),
-		// `<img src = "../assets/img2.png" alt="alt text" />`:               j(root, "../assets/img2.png"),
-		// `< img src = "img3.png" alt="alt text" />`:                        j(root, "img3.png"),
+		"[![video](./assets/img6.png)](https://youtube.com)":           j(root, "./assets/img6.png"),
 	}
 }
 
-var markdown = `
-# Test file
-
-## Paragraph
-
-![link to an image](https://somesite.com/picture.png)
-`
+func htmlImages(root string) map[string]string {
+	return map[string]string{
+		`<img src="assets/img7.webp" alt="alt text" style="zoom:50%;" />`: j(root, "./assets/img7.webp"),
+		`<img src = "../assets/img8.png" alt="alt text" />`:               j(root, "../assets/img8.png"),
+		`<img src=img9.png alt="alt text" />`:                             j(root, "img9.png"),
+	}
+}
 
 const lorem = "Lorem ipsum dolor sit amet"
 
-func TestParseMd(t *testing.T) {
-	want := []string{}
+func makeMarkdown(path string) (string, []string) {
+	var markdown = ` # Test file\n## Paragraph\n
+		![link to an image](https://somesite.com/picture.png)`
 
-	for k, v := range getTestImages("notes") {
+	images := []string{}
+
+	for k, v := range mdImages(path) {
 		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, k)
-		want = append(want, v)
+		images = append(images, v)
 	}
 
-	fileSystem := fstest.MapFS{
-		"notes/note.md": {Data: []byte(markdown)},
+	for k, v := range htmlImages(path) {
+		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, k)
+		images = append(images, v)
 	}
 
-	got, err := GetImagesFromFile(fileSystem, "notes/note.md")
+	return markdown, images
+}
 
-	if err != nil {
-		t.Fatal(err)
+func makeHTML(path string) (string, []string) {
+	var html = ""
+	images := []string{}
+
+	for k, v := range htmlImages(path) {
+		html += fmt.Sprintf("\n%s\n%s", lorem, k)
+		images = append(images, v)
 	}
 
+	return html, images
+}
+
+func TestGetImagesFromFile(t *testing.T) {
+
+	t.Run("markdown", func(t *testing.T) {
+		markdown, want := makeMarkdown("notes")
+
+		fileSystem := fstest.MapFS{
+			"notes/note.md": {Data: []byte(markdown)},
+		}
+
+		got, err := GetImagesFromFile(fileSystem, "notes/note.md")
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(t, got, want)
+	})
+
+	t.Run("html", func(t *testing.T) {
+		html, want := makeHTML("pages")
+
+		fileSystem := fstest.MapFS{
+			"pages/page.html": {Data: []byte(html)},
+		}
+
+		got, err := GetImagesFromFile(fileSystem, "pages/page.html")
+		if err != nil {
+			t.Fatal(err)
+		}
+		compare(t, got, want)
+	})
+}
+
+func compare(t *testing.T, got, want []string) {
+	t.Helper()
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 		t.Errorf("difference %+v", difference(got, want))
 	}
-
 }
 
-func difference(slice1 []string, slice2 []string) []string {
+func difference(slice1, slice2 []string) []string {
 	diff := []string{}
 	m := map[string]int{}
 

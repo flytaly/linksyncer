@@ -8,16 +8,18 @@ import (
 )
 
 const (
-	mdImage    = `!\[.+?\]\(\s?(.+?)\s?(?:".+?")?\)` // ![alternate text](imgpath "title")
-	mdImageRef = `\[.+?\]:\s?(\S+)`                  // [image_id]: imgpath "title"
+	mdImage    = `!\[.+?\]\(\s?(.+?)\s?(?:".+?")?\)`                                         // ![alternate text](imgpath "title")
+	mdImageRef = `\[.+?\]:\s?(\S+)`                                                          // [image_id]: imgpath "title"
+	htmlImage  = "<img" + "(?:.|\n)+?" + `src\s?=\s?(?:"(.+?)"|(\S*))` + "(?:.|\n)+?" + "/>" // <img .. src="imgpath" ... />
 )
 
-var mdRegexp = regexp.MustCompile(mdImage + "|" + mdImageRef)
+var mdRegexp = regexp.MustCompile(mdImage + "|" + mdImageRef + "|" + htmlImage)
+var htmlRegexp = regexp.MustCompile(htmlImage)
 var imageExtensions = regexp.MustCompile("(?i)(?:.png|.jpg|.jpeg|.webp|.svg|.tiff|.tff|.gif)$")
 
-func GetImgsFromMD(content string) []string {
+// return flat slice of non-empty capturing groups
+func extractSubmatches(groups [][]string) []string {
 	var result = []string{}
-	groups := mdRegexp.FindAllStringSubmatch(content, -1)
 
 	for _, v := range groups {
 		for _, group := range v[1:] {
@@ -29,8 +31,12 @@ func GetImgsFromMD(content string) []string {
 	return result
 }
 
+func GetImgsFromMD(content string) []string {
+	return extractSubmatches(mdRegexp.FindAllStringSubmatch(content, -1))
+}
+
 func GetImgsFromHTML(content string) []string {
-	return []string{}
+	return extractSubmatches(htmlRegexp.FindAllStringSubmatch(content, -1))
 }
 
 func filterImages(paths []string) []string {
@@ -55,21 +61,26 @@ func GetImagesFromFile(fileSystem fs.FS, path string) ([]string, error) {
 		return []string{}, err
 	}
 
+	var imgPaths []string
+	result := []string{}
+
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".md":
-		imgPaths := filterImages(GetImgsFromMD(string(file)))
-		result := []string{}
-		for _, v := range imgPaths {
-			if !filepath.IsAbs(v) {
-				dir := filepath.Dir(path)
-				result = append(result, filepath.Join(dir, v))
-			} else {
-				result = append(result, v)
-			}
-		}
-
-		return result, nil
+		imgPaths = GetImgsFromMD(string(file))
+	case ".html":
+		imgPaths = GetImgsFromHTML(string(file))
 	}
 
-	return []string{}, nil
+	imgPaths = filterImages(imgPaths)
+
+	for _, v := range imgPaths {
+		if !filepath.IsAbs(v) {
+			dir := filepath.Dir(path)
+			result = append(result, filepath.Join(dir, v))
+		} else {
+			result = append(result, v)
+		}
+	}
+
+	return result, nil
 }
