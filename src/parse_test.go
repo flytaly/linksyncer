@@ -13,6 +13,7 @@ var j = filepath.Join
 func mdImages(root string) map[string]string {
 	return map[string]string{
 		`![alt text](./assets/subfolder/image.png)`:                    j(root, "./assets/subfolder/image.png"),
+		`![](no-alt-text.png)`:                                         j(root, "./no-alt-text.png"),
 		`![alt text](assets/img2.jpeg "image title")`:                  j(root, "./assets/img2.jpeg"),
 		`![alt text](img3.gif "title")`:                                j(root, "./img3.gif"),
 		`![alt text](/home/user/notes/assets 2/name with spaces.jpg)`:  "/home/user/notes/assets 2/name with spaces.jpg", // absolute path
@@ -21,6 +22,7 @@ func mdImages(root string) map[string]string {
 		`![alt text](./non_latin/изображение.svg)`:                     j(root, "./non_latin/изображение.svg"),
 		`![alt text][imgid1] \n[imgid1]: assets/ref_image.png "title"`: j(root, "assets/ref_image.png"),
 		"[![video](./assets/img6.png)](https://youtube.com)":           j(root, "./assets/img6.png"),
+		"[![](./assets/img7.png)](https://youtube.com)":                j(root, "./assets/img7.png"),
 	}
 }
 

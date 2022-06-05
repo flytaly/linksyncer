@@ -11,7 +11,7 @@ func main() {
 	root, err := os.Getwd()
 
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err)
 	}
 
 	files, _ := imagesync.FileList(os.DirFS(root), ".")
