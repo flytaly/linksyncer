@@ -20,6 +20,10 @@ Lorem ipsum dolor sit amet, qui minim labore adipisicing minim sint cillum sint 
 
 ![](/home/flytaly/go/src/imagesync/test_files/assets/8e49edbc88ac9d54b85e410d0d2a84f881759423.png)
 
+![](/home/outside1.png)
+
+![](../../../outside2.png)
+
 ![img3](./images/name%20with%20spaces.png)
 
 ## Img reference

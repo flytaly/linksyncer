@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	imagesync "imagesync/src"
+	"imagesync"
 	"log"
 	"os"
 )
@@ -13,6 +13,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	isync := imagesync.New(root)
+
+	fsystem := os.DirFS(root)
+	isync.FindFiles(fsystem, ".")
 
 	files, _ := imagesync.FileList(os.DirFS(root), ".")
 
@@ -26,5 +31,4 @@ func main() {
 
 		fmt.Printf("%v images %v\n", v, images)
 	}
-
 }
