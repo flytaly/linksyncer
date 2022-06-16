@@ -14,21 +14,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	isync := imagesync.New(root)
+	isync := imagesync.New(os.DirFS(root), root)
 
-	fsystem := os.DirFS(root)
-	isync.FindFiles(fsystem, ".")
+	isync.FindFiles()
+	isync.ParseFiles()
 
-	files, _ := imagesync.FileList(os.DirFS(root), ".")
-
-	for _, v := range files {
-		images, err := imagesync.GetImagesFromFile(os.DirFS(root), v)
-
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-
-		fmt.Printf("%v images %v\n", v, images)
+	for image, files := range isync.Images {
+		fmt.Printf("%v -> %v\n", image, files)
 	}
+
 }

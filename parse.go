@@ -15,7 +15,7 @@ const (
 
 var mdRegexp = regexp.MustCompile(mdImage + "|" + mdImageRef + "|" + htmlImage)
 var htmlRegexp = regexp.MustCompile(htmlImage)
-var imageExtensions = regexp.MustCompile("(?i)(?:.png|.jpg|.jpeg|.webp|.svg|.tiff|.tff|.gif)$")
+var imageExtensions = regexp.MustCompile("(?i)(?:" + ImgExtensions + ")$")
 
 // return flat slice of non-empty capturing groups
 func extractSubmatches(groups [][]string) []string {

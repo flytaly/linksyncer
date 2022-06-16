@@ -2,8 +2,8 @@ package imagesync
 
 import (
 	"fmt"
+	"imagesync/testutils"
 	"path/filepath"
-	"reflect"
 	"testing"
 	"testing/fstest"
 )
@@ -80,7 +80,7 @@ func TestGetImagesFromFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		compare(t, got, want)
+		testutils.Compare(t, got, want)
 	})
 
 	t.Run("html", func(t *testing.T) {
@@ -94,34 +94,6 @@ func TestGetImagesFromFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		compare(t, got, want)
+		testutils.Compare(t, got, want)
 	})
-}
-
-func compare(t *testing.T, got, want []string) {
-	t.Helper()
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v, want %+v", got, want)
-		t.Errorf("difference %+v", difference(got, want))
-	}
-}
-
-func difference(slice1, slice2 []string) []string {
-	diff := []string{}
-	m := map[string]int{}
-
-	for _, v := range slice1 {
-		m[v] = 1
-	}
-	for _, v := range slice2 {
-		m[v] = m[v] + 1
-	}
-
-	for k, v := range m {
-		if v == 1 {
-			diff = append(diff, k)
-		}
-	}
-
-	return diff
 }
