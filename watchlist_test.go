@@ -11,7 +11,7 @@ func TestWatchList(t *testing.T) {
 	emptyFile := []byte("")
 	j := filepath.Join
 
-	watchFiles := []string{
+	files := []string{
 		j("notes", "note.md"),
 		j("pages", "subfolder", "page.html"),
 		j("somepage.htm"),
@@ -24,39 +24,36 @@ func TestWatchList(t *testing.T) {
 		j("node_modules", "module", "page.html"),
 	}
 
-	want := []string{
+	dirs := []string{
 		j("notes"),
 		j("pages"),
 		j("pages", "subfolder"),
 		j("skip"),
 	}
 
-	want = append(want, watchFiles...)
-
 	fs := fstest.MapFS{
-		watchFiles[0]: {Data: emptyFile},
-		watchFiles[1]: {Data: emptyFile},
-		watchFiles[2]: {Data: emptyFile},
+		files[0]: {Data: emptyFile},
+		files[1]: {Data: emptyFile},
+		files[2]: {Data: emptyFile},
 	}
 
 	for _, v := range skipFiles {
 		fs[v] = &fstest.MapFile{Data: []byte("")}
 	}
 
-	watchPaths, err := WatchList(fs, ".")
+	gotDirs, gotFiles, err := WatchList(fs, ".")
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got := make([]string, 0, len(watchPaths))
-
-	for path := range watchPaths {
-		got = append(got, path)
+	if d := testutils.Difference(gotDirs, dirs); len(d) > 0 {
+		t.Errorf("Directories: got %+v, want %+v", gotDirs, dirs)
+		t.Errorf("difference %+v", d)
 	}
 
-	if d := testutils.Difference(got, want); len(d) > 0 {
-		t.Errorf("got %+v, want %+v", got, want)
+	if d := testutils.Difference(gotFiles, files); len(d) > 0 {
+		t.Errorf("Files: got %+v, want %+v", gotFiles, files)
 		t.Errorf("difference %+v", d)
 	}
 }

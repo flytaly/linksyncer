@@ -16,11 +16,15 @@ func main() {
 
 	isync := imagesync.New(os.DirFS(root), root)
 
-	isync.FindFiles()
-	isync.ParseFiles()
+	isync.ProcessFiles()
 
+	fmt.Println("Files")
+	for k, v := range isync.Files {
+		fmt.Printf("%v -> %v\n", k, v)
+	}
+
+	fmt.Println("Images")
 	for image, files := range isync.Images {
 		fmt.Printf("%v -> %v\n", image, files)
 	}
-
 }

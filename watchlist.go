@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var allowedExt = regexp.MustCompile("(?i)(" + ValidFilesExtensions + "|" + ImgExtensions + ")$")
+var allowedExt = regexp.MustCompile("(?i)(" + ValidFilesExtensions + ")$")
 
 func shouldSkipDir(name string) bool {
 	if name == "." {
@@ -21,10 +21,8 @@ func shouldSkipDir(name string) bool {
 type PathList = map[string]fs.FileInfo
 
 // Returns a map of files and directories which should be watched for changes
-func WatchList(fileSystem fs.FS, path string) (PathList, error) {
-	var files = PathList{}
-
-	err := fs.WalkDir(fileSystem, path, func(path string, d fs.DirEntry, err error) error {
+func WatchList(fileSystem fs.FS, path string) (dirs []string, files []string, err error) {
+	err = fs.WalkDir(fileSystem, path, func(path string, d fs.DirEntry, err error) error {
 		name := d.Name()
 
 		if err != nil {
@@ -32,29 +30,25 @@ func WatchList(fileSystem fs.FS, path string) (PathList, error) {
 			return nil
 		}
 
-		// skip hidden and some other dirs
-		if d.IsDir() && shouldSkipDir(name) {
-			return filepath.SkipDir
-		}
-
 		if name == "." {
 			return nil
 		}
 
-		if !d.IsDir() && !allowedExt.MatchString(name) {
+		if d.IsDir() {
+			// skip hidden and some other dirs
+			if shouldSkipDir(name) {
+				return filepath.SkipDir
+			}
+			dirs = append(dirs, path)
 			return nil
 		}
 
-		info, err := d.Info()
-
-		if err != nil {
-			return nil
+		if allowedExt.MatchString(name) {
+			files = append(files, path)
 		}
-
-		files[path] = info
 
 		return nil
 	})
 
-	return files, err
+	return dirs, files, err
 }
