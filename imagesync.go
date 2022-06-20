@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"path/filepath"
 )
 
 type ImageSync struct {
@@ -29,7 +30,7 @@ var watchList = WatchList
 var extractImages = GetImagesFromFile
 
 func (s *ImageSync) ProcessFiles() {
-	dirs, files, err := watchList(s.fileSystem, ".")
+	dirs, files, err := watchList(s.fileSystem, s.root)
 	if err != nil {
 		log.Println(err)
 		return
@@ -45,7 +46,14 @@ func (s *ImageSync) ProcessFiles() {
 }
 
 func (s *ImageSync) ParseFile(filePath string) {
-	images, err := extractImages(s.fileSystem, filePath)
+	relativePath, err := filepath.Rel(s.root, filePath)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	images, err := extractImages(s.fileSystem, relativePath, s.root)
 
 	if err != nil {
 		fmt.Println(err)

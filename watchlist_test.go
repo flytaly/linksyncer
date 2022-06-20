@@ -8,6 +8,7 @@ import (
 )
 
 func TestWatchList(t *testing.T) {
+	root := "/home/username/dir"
 	emptyFile := []byte("")
 	j := filepath.Join
 
@@ -25,10 +26,10 @@ func TestWatchList(t *testing.T) {
 	}
 
 	dirs := []string{
-		j("notes"),
-		j("pages"),
-		j("pages", "subfolder"),
-		j("skip"),
+		j(root, "notes"),
+		j(root, "pages"),
+		j(root, "pages", "subfolder"),
+		j(root, "skip"),
 	}
 
 	fs := fstest.MapFS{
@@ -41,7 +42,7 @@ func TestWatchList(t *testing.T) {
 		fs[v] = &fstest.MapFile{Data: []byte("")}
 	}
 
-	gotDirs, gotFiles, err := WatchList(fs, ".")
+	gotDirs, gotFiles, err := WatchList(fs, root)
 
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +53,13 @@ func TestWatchList(t *testing.T) {
 		t.Errorf("difference %+v", d)
 	}
 
-	if d := testutils.Difference(gotFiles, files); len(d) > 0 {
+	filesWant := []string{}
+
+	for _, v := range files {
+		filesWant = append(filesWant, j(root, v))
+	}
+
+	if d := testutils.Difference(gotFiles, filesWant); len(d) > 0 {
 		t.Errorf("Files: got %+v, want %+v", gotFiles, files)
 		t.Errorf("difference %+v", d)
 	}

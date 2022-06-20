@@ -21,8 +21,8 @@ func shouldSkipDir(name string) bool {
 type PathList = map[string]fs.FileInfo
 
 // Returns a map of files and directories which should be watched for changes
-func WatchList(fileSystem fs.FS, path string) (dirs []string, files []string, err error) {
-	err = fs.WalkDir(fileSystem, path, func(path string, d fs.DirEntry, err error) error {
+func WatchList(fileSystem fs.FS, root string) (dirs []string, files []string, err error) {
+	err = fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		name := d.Name()
 
 		if err != nil {
@@ -39,12 +39,12 @@ func WatchList(fileSystem fs.FS, path string) (dirs []string, files []string, er
 			if shouldSkipDir(name) {
 				return filepath.SkipDir
 			}
-			dirs = append(dirs, path)
+			dirs = append(dirs, filepath.Join(root, path))
 			return nil
 		}
 
 		if allowedExt.MatchString(name) {
-			files = append(files, path)
+			files = append(files, filepath.Join(root, path))
 		}
 
 		return nil

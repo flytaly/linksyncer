@@ -8,9 +8,8 @@ import (
 	"testing/fstest"
 )
 
-var j = filepath.Join
-
 func mdImages(root string) map[string]string {
+	var j = filepath.Join
 	return map[string]string{
 		`![alt text](./assets/subfolder/image.png)`:                    j(root, "./assets/subfolder/image.png"),
 		`![](no-alt-text.png)`:                                         j(root, "./no-alt-text.png"),
@@ -27,6 +26,7 @@ func mdImages(root string) map[string]string {
 }
 
 func htmlImages(root string) map[string]string {
+	var j = filepath.Join
 	return map[string]string{
 		`<img src="assets/img7.webp" alt="alt text" style="zoom:50%;" />`: j(root, "./assets/img7.webp"),
 		`<img src = "../assets/img8.png" alt="alt text" />`:               j(root, "../assets/img8.png"),
@@ -70,13 +70,13 @@ func makeHTML(path string) (string, []string) {
 func TestGetImagesFromFile(t *testing.T) {
 
 	t.Run("markdown", func(t *testing.T) {
-		markdown, want := makeMarkdown("notes")
+		markdown, want := makeMarkdown("/home/user/notes/my_notes")
 
 		fileSystem := fstest.MapFS{
-			"notes/note.md": {Data: []byte(markdown)},
+			"my_notes/note.md": {Data: []byte(markdown)},
 		}
 
-		got, err := GetImagesFromFile(fileSystem, "notes/note.md")
+		got, err := GetImagesFromFile(fileSystem, "my_notes/note.md", "/home/user/notes")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,13 +84,13 @@ func TestGetImagesFromFile(t *testing.T) {
 	})
 
 	t.Run("html", func(t *testing.T) {
-		html, want := makeHTML("pages")
+		html, want := makeHTML("/home/user/pages/my_pages")
 
 		fileSystem := fstest.MapFS{
-			"pages/page.html": {Data: []byte(html)},
+			"my_pages/page.html": {Data: []byte(html)},
 		}
 
-		got, err := GetImagesFromFile(fileSystem, "pages/page.html")
+		got, err := GetImagesFromFile(fileSystem, "my_pages/page.html", "/home/user/pages")
 		if err != nil {
 			t.Fatal(err)
 		}

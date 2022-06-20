@@ -54,7 +54,7 @@ func filterImages(paths []string) []string {
 	return result
 }
 
-func GetImagesFromFile(fileSystem fs.FS, path string) ([]string, error) {
+func GetImagesFromFile(fileSystem fs.FS, path string, root string) ([]string, error) {
 	file, err := fs.ReadFile(fileSystem, path)
 
 	if err != nil {
@@ -76,7 +76,7 @@ func GetImagesFromFile(fileSystem fs.FS, path string) ([]string, error) {
 	for _, v := range imgPaths {
 		if !filepath.IsAbs(v) {
 			dir := filepath.Dir(path)
-			result = append(result, filepath.Join(dir, v))
+			result = append(result, filepath.Join(root, dir, v))
 		} else {
 			result = append(result, v)
 		}
