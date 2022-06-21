@@ -9,10 +9,10 @@ import (
 
 type ImageSync struct {
 	fileSystem fs.FS
-	root       string              // path to the root directory
-	Dirs       map[string]bool     // watching directories
-	Files      map[string][]string // watching files
-	Images     map[string][]string // map images' paths to their text files
+	root       string                 // path to the root directory
+	Dirs       map[string]bool        // watching directories
+	Files      map[string][]ImageInfo // watching files
+	Images     map[string][]string    // map images' paths to their text files
 }
 
 // Creates a new ImageSync
@@ -20,7 +20,7 @@ func New(fileSystem fs.FS, root string) *ImageSync {
 	return &ImageSync{
 		root:       root,
 		Dirs:       map[string]bool{},
-		Files:      map[string][]string{},
+		Files:      map[string][]ImageInfo{},
 		Images:     map[string][]string{},
 		fileSystem: fileSystem,
 	}
@@ -40,7 +40,7 @@ func (s *ImageSync) ProcessFiles() {
 		s.Dirs[path] = true
 	}
 	for _, path := range files {
-		s.Files[path] = []string{}
+		s.Files[path] = []ImageInfo{}
 		s.ParseFile(path)
 	}
 }
@@ -60,8 +60,8 @@ func (s *ImageSync) ParseFile(filePath string) {
 		return
 	}
 
-	for _, v := range images {
-		s.Images[v] = append(s.Images[v], filePath)
-		s.Files[filePath] = append(s.Files[filePath], v)
+	for _, img := range images {
+		s.Images[img.absPath] = append(s.Images[img.absPath], filePath)
+		s.Files[filePath] = append(s.Files[filePath], img)
 	}
 }

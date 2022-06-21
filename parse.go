@@ -17,6 +17,11 @@ var mdRegexp = regexp.MustCompile(mdImage + "|" + mdImageRef + "|" + htmlImage)
 var htmlRegexp = regexp.MustCompile(htmlImage)
 var imageExtensions = regexp.MustCompile("(?i)(?:" + ImgExtensions + ")$")
 
+type ImageInfo struct {
+	absPath  string
+	original string
+}
+
 // return flat slice of non-empty capturing groups
 func extractSubmatches(groups [][]string) []string {
 	var result = []string{}
@@ -54,17 +59,17 @@ func filterImages(paths []string) []string {
 	return result
 }
 
-func GetImagesFromFile(fileSystem fs.FS, path string, root string) ([]string, error) {
-	file, err := fs.ReadFile(fileSystem, path)
+func GetImagesFromFile(fileSystem fs.FS, filePath string, root string) ([]ImageInfo, error) {
+	file, err := fs.ReadFile(fileSystem, filePath)
 
 	if err != nil {
-		return []string{}, err
+		return []ImageInfo{}, err
 	}
 
 	var imgPaths []string
-	result := []string{}
+	result := []ImageInfo{}
 
-	switch strings.ToLower(filepath.Ext(path)) {
+	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md":
 		imgPaths = GetImgsFromMD(string(file))
 	case ".html":
@@ -73,12 +78,13 @@ func GetImagesFromFile(fileSystem fs.FS, path string, root string) ([]string, er
 
 	imgPaths = filterImages(imgPaths)
 
-	for _, v := range imgPaths {
-		if !filepath.IsAbs(v) {
-			dir := filepath.Dir(path)
-			result = append(result, filepath.Join(root, dir, v))
+	for _, p := range imgPaths {
+		if !filepath.IsAbs(p) {
+			dir := filepath.Dir(filePath)
+			info := ImageInfo{original: p, absPath: filepath.Join(root, dir, p)}
+			result = append(result, info)
 		} else {
-			result = append(result, v)
+			result = append(result, ImageInfo{original: p, absPath: p})
 		}
 	}
 

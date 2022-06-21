@@ -2,66 +2,76 @@ package imagesync
 
 import (
 	"fmt"
-	"imagesync/testutils"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"testing/fstest"
 )
 
-func mdImages(root string) map[string]string {
-	var j = filepath.Join
+func mdImages() map[string]string {
 	return map[string]string{
-		`![alt text](./assets/subfolder/image.png)`:                    j(root, "./assets/subfolder/image.png"),
-		`![](no-alt-text.png)`:                                         j(root, "./no-alt-text.png"),
-		`![alt text](assets/img2.jpeg "image title")`:                  j(root, "./assets/img2.jpeg"),
-		`![alt text](img3.gif "title")`:                                j(root, "./img3.gif"),
+		`![alt text](./assets/subfolder/image.png)`:                    "./assets/subfolder/image.png",
+		`![](no-alt-text.png)`:                                         "no-alt-text.png",
+		`![alt text](assets/img2.jpeg "image title")`:                  "assets/img2.jpeg",
+		`![alt text](img3.gif "title")`:                                "img3.gif",
 		`![alt text](/home/user/notes/assets 2/name with spaces.jpg)`:  "/home/user/notes/assets 2/name with spaces.jpg", // absolute path
-		`![alt text](../assets/img4.svg "title")`:                      j(root, "../assets/img4.svg"),
-		`![alt text](../../outside_dir/img5.svg)`:                      j(root, "../../outside_dir/img5.svg"),
-		`![alt text](./non_latin/изображение.svg)`:                     j(root, "./non_latin/изображение.svg"),
-		`![alt text][imgid1] \n[imgid1]: assets/ref_image.png "title"`: j(root, "assets/ref_image.png"),
-		"[![video](./assets/img6.png)](https://youtube.com)":           j(root, "./assets/img6.png"),
-		"[![](./assets/img7.png)](https://youtube.com)":                j(root, "./assets/img7.png"),
+		`![alt text](../assets/img4.svg "title")`:                      "../assets/img4.svg",
+		`![alt text](../../outside_dir/img5.svg)`:                      "../../outside_dir/img5.svg",
+		`![alt text](./non_latin/изображение.svg)`:                     "./non_latin/изображение.svg",
+		`![alt text][imgid1] \n[imgid1]: assets/ref_image.png "title"`: "assets/ref_image.png",
+		"[![video](./assets/img6.png)](https://youtube.com)":           "./assets/img6.png",
+		"[![](./assets/img7.png)](https://youtube.com)":                "./assets/img7.png",
 	}
 }
 
-func htmlImages(root string) map[string]string {
-	var j = filepath.Join
+func htmlImages() map[string]string {
 	return map[string]string{
-		`<img src="assets/img7.webp" alt="alt text" style="zoom:50%;" />`: j(root, "./assets/img7.webp"),
-		`<img src = "../assets/img8.png" alt="alt text" />`:               j(root, "../assets/img8.png"),
-		`<img src=img9.png alt="alt text" />`:                             j(root, "img9.png"),
+		`<img src="assets/img7.webp" alt="alt text" style="zoom:50%;" />`: "assets/img7.webp",
+		`<img src = "../assets/img8.png" alt="alt text" />`:               "../assets/img8.png",
+		`<img src=img9.png alt="alt text" />`:                             "img9.png",
 	}
 }
 
 const lorem = "Lorem ipsum dolor sit amet"
 
-func makeMarkdown(path string) (string, []string) {
+func makeMarkdown(basepath string) (string, []ImageInfo) {
 	var markdown = ` # Test file\n## Paragraph\n
 		![link to an image](https://somesite.com/picture.png)`
 
-	images := []string{}
+	images := []ImageInfo{}
 
-	for k, v := range mdImages(path) {
+	for k, path := range mdImages() {
+		absPath := path
+		if !filepath.IsAbs(absPath) {
+			absPath = filepath.Join(basepath, path)
+		}
+		images = append(images, ImageInfo{absPath: absPath, original: path})
 		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, k)
-		images = append(images, v)
 	}
 
-	for k, v := range htmlImages(path) {
+	for k, path := range htmlImages() {
+		absPath := path
+		if !filepath.IsAbs(absPath) {
+			absPath = filepath.Join(basepath, path)
+		}
+		images = append(images, ImageInfo{absPath: absPath, original: path})
 		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, k)
-		images = append(images, v)
 	}
 
 	return markdown, images
 }
 
-func makeHTML(path string) (string, []string) {
+func makeHTML(basepath string) (string, []ImageInfo) {
 	var html = ""
-	images := []string{}
+	images := []ImageInfo{}
 
-	for k, v := range htmlImages(path) {
+	for k, path := range htmlImages() {
+		absPath := path
+		if !filepath.IsAbs(absPath) {
+			absPath = filepath.Join(basepath, path)
+		}
+		images = append(images, ImageInfo{absPath: absPath, original: path})
 		html += fmt.Sprintf("\n%s\n%s", lorem, k)
-		images = append(images, v)
 	}
 
 	return html, images
@@ -80,7 +90,10 @@ func TestGetImagesFromFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		testutils.Compare(t, got, want)
+
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %v,\n want: %v\n", got, want)
+		}
 	})
 
 	t.Run("html", func(t *testing.T) {
@@ -94,6 +107,9 @@ func TestGetImagesFromFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		testutils.Compare(t, got, want)
+
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("got: %v,\n want: %v\n", got, want)
+		}
 	})
 }

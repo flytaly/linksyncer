@@ -33,12 +33,26 @@ func TestProcessFiles(t *testing.T) {
 		t.Errorf("got %v, want %v", iSync.Dirs, wantDirs)
 	}
 
-	wantFiles := map[string][]string{
-		j(root, "n/sub/note.md"):  {j(root, "n/sub/assets/image01.png"), j(root, "n/sub/assets/image02.png")},
-		j(root, "n/sub/note2.md"): {j(root, "n/sub/assets/image02.png")},
+	wantFiles := map[string][]ImageInfo{
+		j(root, "n/sub/note.md"): {
+			ImageInfo{
+				absPath:  j(root, "n/sub/", "./assets/image01.png"),
+				original: "./assets/image01.png",
+			},
+			ImageInfo{
+				absPath:  j(root, "n/sub/", "./assets/image02.png"),
+				original: "./assets/image02.png",
+			},
+		},
+		j(root, "n/sub/note2.md"): {
+			ImageInfo{
+				absPath:  j(root, "n/sub/", "./assets/image02.png"),
+				original: "./assets/image02.png",
+			},
+		},
 	}
 	if !reflect.DeepEqual(iSync.Files, wantFiles) {
-		t.Errorf("got %v, want %v", iSync.Files, wantFiles)
+		t.Errorf("got %v,\n want %v", iSync.Files, wantFiles)
 	}
 
 	wantImages := map[string][]string{
