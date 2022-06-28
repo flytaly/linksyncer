@@ -1,7 +1,6 @@
 package imagesync
 
 import (
-	"fmt"
 	"io/fs"
 	"log"
 	"path/filepath"
@@ -29,6 +28,7 @@ func New(fileSystem fs.FS, root string) *ImageSync {
 var watchList = WatchList
 var extractImages = GetImagesFromFile
 
+// Walks the file tree and fill Images and Files maps
 func (s *ImageSync) ProcessFiles() {
 	dirs, files, err := watchList(s.fileSystem, s.root)
 	if err != nil {
@@ -45,18 +45,19 @@ func (s *ImageSync) ProcessFiles() {
 	}
 }
 
+// Extract image paths from supported files and add them into `Images`
 func (s *ImageSync) ParseFile(filePath string) {
 	relativePath, err := filepath.Rel(s.root, filePath)
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
 	images, err := extractImages(s.fileSystem, relativePath, s.root)
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
@@ -64,4 +65,28 @@ func (s *ImageSync) ParseFile(filePath string) {
 		s.Images[img.absPath] = append(s.Images[img.absPath], filePath)
 		s.Files[filePath] = append(s.Files[filePath], img)
 	}
+}
+
+// Remove a file and its images from the ImageSync struct
+func (s *ImageSync) RemoveFile(filePath string) {
+
+	if images, ok := s.Files[filePath]; ok {
+		for _, image := range images {
+			if files, ok := s.Images[image.absPath]; ok {
+				s.Images[image.absPath] = filter(files, func(s string) bool { return s != filePath })
+			}
+
+		}
+		delete(s.Files, filePath)
+	}
+
+}
+
+func filter(ss []string, test func(string) bool) (res []string) {
+	for _, s := range ss {
+		if test(s) {
+			res = append(res, s)
+		}
+	}
+	return
 }
