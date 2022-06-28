@@ -40,9 +40,13 @@ func (s *ImageSync) ProcessFiles() {
 		s.Dirs[path] = true
 	}
 	for _, path := range files {
-		s.Files[path] = []ImageInfo{}
-		s.ParseFile(path)
+		s.AddFile(path)
 	}
+}
+
+func (s *ImageSync) AddFile(filePath string) {
+	s.Files[filePath] = []ImageInfo{}
+	s.ParseFile(filePath)
 }
 
 // Extract image paths from supported files and add them into `Images`
@@ -69,7 +73,6 @@ func (s *ImageSync) ParseFile(filePath string) {
 
 // Remove a file and its images from the ImageSync struct
 func (s *ImageSync) RemoveFile(filePath string) {
-
 	if images, ok := s.Files[filePath]; ok {
 		for _, image := range images {
 			if files, ok := s.Images[image.absPath]; ok {
@@ -79,7 +82,13 @@ func (s *ImageSync) RemoveFile(filePath string) {
 		}
 		delete(s.Files, filePath)
 	}
+}
 
+func (s *ImageSync) RenameFile(prevPath, newPath string) {
+	// TODO: Image links in the file should be updated after file relocation
+
+	s.RemoveFile(prevPath)
+	s.AddFile(newPath)
 }
 
 func filter(ss []string, test func(string) bool) (res []string) {

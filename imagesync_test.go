@@ -1,6 +1,7 @@
 package imagesync
 
 import (
+	"io/fs"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -130,4 +131,46 @@ func TestRemoveFile(t *testing.T) {
 		}
 	})
 
+}
+
+func TestRenameFile(t *testing.T) {
+	root := "/home/user/notes"
+	j := filepath.Join
+
+	prevName := j(root, "/original_name.md")
+	newName := j(root, "/new_name.md")
+	note2 := j(root, "/note2.md")
+	img1 := ImageInfo{absPath: j(root, "./assets/i1.png"), original: "./assets/i1.png"}
+	img2 := ImageInfo{absPath: j(root, "./assets/i2.png"), original: "./assets/i2.png"}
+
+	iSync := New(fstest.MapFS{}, root)
+
+	iSync.Files = map[string][]ImageInfo{prevName: {img1, img2}, note2: {img2}}
+	iSync.Images = map[string][]string{
+		j(root, "assets/i1.png"): {prevName},
+		j(root, "assets/i2.png"): {prevName, note2},
+	}
+
+	extractImagesOriginal := extractImages
+
+	extractImages = func(fileSystem fs.FS, filePath, root string) ([]ImageInfo, error) {
+		return []ImageInfo{img1, img2}, nil
+	}
+
+	iSync.RenameFile(prevName, newName)
+
+	extractImages = extractImagesOriginal
+
+	wantFiles := map[string][]ImageInfo{newName: {img1, img2}, note2: {img2}}
+	if !reflect.DeepEqual(iSync.Files, wantFiles) {
+		t.Errorf("got %v, want %v", iSync.Files, wantFiles)
+	}
+
+	wantImages := map[string][]string{
+		j(root, "assets/i1.png"): {newName},
+		j(root, "assets/i2.png"): {note2, newName},
+	}
+	if !reflect.DeepEqual(iSync.Images, wantImages) {
+		t.Errorf("got %v, want %v", iSync.Images, wantImages)
+	}
 }
