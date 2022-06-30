@@ -1,7 +1,6 @@
 package imagesync
 
 import (
-	"io/fs"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -18,8 +17,9 @@ var htmlRegexp = regexp.MustCompile(htmlImage)
 var imageExtensions = regexp.MustCompile("(?i)(?:" + ImgExtensions + ")$")
 
 type ImageInfo struct {
-	absPath  string
-	original string
+	absPath      string
+	originalLink string
+}
 }
 
 // return flat slice of non-empty capturing groups
@@ -59,21 +59,18 @@ func filterImages(paths []string) []string {
 	return result
 }
 
-func GetImagesFromFile(fileSystem fs.FS, filePath string, root string) ([]ImageInfo, error) {
-	file, err := fs.ReadFile(fileSystem, filePath)
-
-	if err != nil {
-		return []ImageInfo{}, err
-	}
-
+// Extracts images from a file's content. filePath argument should be absolute.
+func GetImagesFromFile(filePath string, content string) []ImageInfo {
 	var imgPaths []string
 	result := []ImageInfo{}
 
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md":
-		imgPaths = GetImgsFromMD(string(file))
+		imgPaths = GetImgsFromMD(content)
 	case ".html":
-		imgPaths = GetImgsFromHTML(string(file))
+		imgPaths = GetImgsFromHTML(content)
+	default:
+		return result
 	}
 
 	imgPaths = filterImages(imgPaths)
@@ -81,12 +78,12 @@ func GetImagesFromFile(fileSystem fs.FS, filePath string, root string) ([]ImageI
 	for _, p := range imgPaths {
 		if !filepath.IsAbs(p) {
 			dir := filepath.Dir(filePath)
-			info := ImageInfo{original: p, absPath: filepath.Join(root, dir, p)}
+			info := ImageInfo{originalLink: p, absPath: filepath.Join(dir, p)}
 			result = append(result, info)
 		} else {
-			result = append(result, ImageInfo{original: p, absPath: p})
+			result = append(result, ImageInfo{originalLink: p, absPath: p})
 		}
 	}
 
-	return result, nil
+	return result
 }

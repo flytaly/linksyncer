@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
-	"testing/fstest"
 )
 
 func mdImages() map[string]string {
@@ -45,7 +44,7 @@ func makeMarkdown(basepath string) (string, []ImageInfo) {
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(basepath, path)
 		}
-		images = append(images, ImageInfo{absPath: absPath, original: path})
+		images = append(images, ImageInfo{absPath: absPath, originalLink: path})
 		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, k)
 	}
 
@@ -54,7 +53,7 @@ func makeMarkdown(basepath string) (string, []ImageInfo) {
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(basepath, path)
 		}
-		images = append(images, ImageInfo{absPath: absPath, original: path})
+		images = append(images, ImageInfo{absPath: absPath, originalLink: path})
 		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, k)
 	}
 
@@ -70,7 +69,7 @@ func makeHTML(basepath string) (string, []ImageInfo) {
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(basepath, path)
 		}
-		images = append(images, ImageInfo{absPath: absPath, original: path})
+		images = append(images, ImageInfo{absPath: absPath, originalLink: path})
 		html += fmt.Sprintf("\n%s\n%s", lorem, k)
 	}
 
@@ -82,14 +81,7 @@ func TestGetImagesFromFile(t *testing.T) {
 	t.Run("markdown", func(t *testing.T) {
 		markdown, want := makeMarkdown("/home/user/notes/my_notes")
 
-		fileSystem := fstest.MapFS{
-			"my_notes/note.md": {Data: []byte(markdown)},
-		}
-
-		got, err := GetImagesFromFile(fileSystem, "my_notes/note.md", "/home/user/notes")
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := GetImagesFromFile("/home/user/notes/my_notes/note.md", markdown)
 
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("got: %v,\n want: %v\n", got, want)
@@ -99,14 +91,7 @@ func TestGetImagesFromFile(t *testing.T) {
 	t.Run("html", func(t *testing.T) {
 		html, want := makeHTML("/home/user/pages/my_pages")
 
-		fileSystem := fstest.MapFS{
-			"my_pages/page.html": {Data: []byte(html)},
-		}
-
-		got, err := GetImagesFromFile(fileSystem, "my_pages/page.html", "/home/user/pages")
-		if err != nil {
-			t.Fatal(err)
-		}
+		got := GetImagesFromFile("/home/user/pages/my_pages/page.html", html)
 
 		if !reflect.DeepEqual(got, want) {
 			t.Fatalf("got: %v,\n want: %v\n", got, want)

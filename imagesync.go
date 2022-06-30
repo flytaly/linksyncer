@@ -51,19 +51,14 @@ func (s *ImageSync) AddFile(filePath string) {
 
 // Extract image paths from supported files and add them into `Images`
 func (s *ImageSync) ParseFile(filePath string) {
-	relativePath, err := filepath.Rel(s.root, filePath)
+	data, err := s.ReadFile(filePath)
 
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	images, err := extractImages(s.fileSystem, relativePath, s.root)
-
-	if err != nil {
-		log.Println(err)
-		return
-	}
+	images := extractImages(filePath, string(data))
 
 	for _, img := range images {
 		s.Images[img.absPath] = append(s.Images[img.absPath], filePath)
@@ -89,6 +84,22 @@ func (s *ImageSync) RenameFile(prevPath, newPath string) {
 
 	s.RemoveFile(prevPath)
 	s.AddFile(newPath)
+}
+
+func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
+	relativePath, err := filepath.Rel(s.root, filePath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := fs.ReadFile(s.fileSystem, relativePath)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func filter(ss []string, test func(string) bool) (res []string) {

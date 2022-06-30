@@ -1,7 +1,6 @@
 package imagesync
 
 import (
-	"io/fs"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -37,18 +36,18 @@ func TestProcessFiles(t *testing.T) {
 	wantFiles := map[string][]ImageInfo{
 		j(root, "n/sub/note.md"): {
 			ImageInfo{
-				absPath:  j(root, "n/sub/", "./assets/image01.png"),
-				original: "./assets/image01.png",
+				absPath:      j(root, "n/sub/", "./assets/image01.png"),
+				originalLink: "./assets/image01.png",
 			},
 			ImageInfo{
-				absPath:  j(root, "n/sub/", "./assets/image02.png"),
-				original: "./assets/image02.png",
+				absPath:      j(root, "n/sub/", "./assets/image02.png"),
+				originalLink: "./assets/image02.png",
 			},
 		},
 		j(root, "n/sub/note2.md"): {
 			ImageInfo{
-				absPath:  j(root, "n/sub/", "./assets/image02.png"),
-				original: "./assets/image02.png",
+				absPath:      j(root, "n/sub/", "./assets/image02.png"),
+				originalLink: "./assets/image02.png",
 			},
 		},
 	}
@@ -72,8 +71,8 @@ func TestRemoveFile(t *testing.T) {
 
 	note1 := j(root, "/note1.md")
 	note2 := j(root, "/note2.md")
-	img1 := ImageInfo{absPath: j(root, "./assets/i1.png"), original: "./assets/i1.png"}
-	img2 := ImageInfo{absPath: j(root, "./assets/i2.png"), original: "./assets/i2.png"}
+	img1 := ImageInfo{absPath: j(root, "./assets/i1.png"), originalLink: "./assets/i1.png"}
+	img2 := ImageInfo{absPath: j(root, "./assets/i2.png"), originalLink: "./assets/i2.png"}
 	files := map[string][]ImageInfo{note1: {img1, img2}, note2: {img2}}
 	images := map[string][]string{
 		j(root, "assets/i1.png"): {note1},
@@ -140,10 +139,12 @@ func TestRenameFile(t *testing.T) {
 	prevName := j(root, "/original_name.md")
 	newName := j(root, "/new_name.md")
 	note2 := j(root, "/note2.md")
-	img1 := ImageInfo{absPath: j(root, "./assets/i1.png"), original: "./assets/i1.png"}
-	img2 := ImageInfo{absPath: j(root, "./assets/i2.png"), original: "./assets/i2.png"}
+	img1 := ImageInfo{absPath: j(root, "./assets/i1.png"), originalLink: "./assets/i1.png"}
+	img2 := ImageInfo{absPath: j(root, "./assets/i2.png"), originalLink: "./assets/i2.png"}
 
-	iSync := New(fstest.MapFS{}, root)
+	iSync := New(fstest.MapFS{
+		"new_name.md": {Data: []byte("")},
+	}, root)
 
 	iSync.Files = map[string][]ImageInfo{prevName: {img1, img2}, note2: {img2}}
 	iSync.Images = map[string][]string{
@@ -153,8 +154,8 @@ func TestRenameFile(t *testing.T) {
 
 	extractImagesOriginal := extractImages
 
-	extractImages = func(fileSystem fs.FS, filePath, root string) ([]ImageInfo, error) {
-		return []ImageInfo{img1, img2}, nil
+	extractImages = func(filePath, content string) []ImageInfo {
+		return []ImageInfo{img1, img2}
 	}
 
 	iSync.RenameFile(prevName, newName)
