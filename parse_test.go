@@ -2,6 +2,7 @@ package imagesync
 
 import (
 	"fmt"
+	"imagesync/testutils"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -97,4 +98,57 @@ func TestGetImagesFromFile(t *testing.T) {
 			t.Fatalf("got: %v,\n want: %v\n", got, want)
 		}
 	})
+
+}
+
+func TestReplaceImageLinks(t *testing.T) {
+	filePath := "/home/user/notes/my_note/note.md"
+	dir := filepath.Dir(filePath)
+	j := filepath.Join
+
+	images := []struct {
+		RenamedImage
+		linkFrom string
+		linkTo   string
+	}{
+		{
+			RenamedImage{j(dir, "image1.png"), j(dir, "image2.png"), "image1.png"},
+			"![](image1.png)",
+			"![](image2.png)",
+		},
+		{
+			RenamedImage{j(dir, "./assets/image2.gif"), j(dir, "./assets/subfolder/i.png"), "./assets/images2.gif"},
+			`![alt text](./assets/images2.gif "title")`,
+			`![alt text](assets/subfolder/i.png "title")`,
+		},
+		{
+			// Absolute path
+			RenamedImage{j(dir, "image3.png"), j(dir, "image4.png"), j(dir, "image3.png")},
+			fmt.Sprintf(`![alt text](%s "title")`, j(dir, "image3.png")),
+			fmt.Sprintf(`![alt text](%s "title")`, j(dir, "image4.png")),
+		},
+		{
+			RenamedImage{j(dir, "../../pics/pic1.png"), j(dir, "../folder/pic1.png"), "../pics/pic1.png"},
+			`<img src = "../pics/pic1.png" alt="alt text" />`,
+			`<img src = "../folder/pic1.png" alt="alt text" />`,
+		},
+	}
+
+	for i, v := range images {
+		t.Run(fmt.Sprintf("Replace case %d", i), func(t *testing.T) {
+			md := fmt.Sprintf("# Test markdown %d\n## Text with images\n%s\ntext after the image...", i, v.linkFrom)
+			want := fmt.Sprintf("# Test markdown %d\n## Text with images\n%s\ntext after the image...", i, v.linkTo)
+
+			got := string(ReplaceImageLinks(filePath, []byte(md), []RenamedImage{v.RenamedImage}))
+			assertText(t, got, want)
+		})
+	}
+}
+
+func assertText(t testing.TB, got, want string) {
+	t.Helper()
+	if got != want {
+		d1, d2 := testutils.StringDifference(got, want)
+		t.Errorf("\n==Got=>\n%s\n==Want=>\n%s\n==Diff=>\n%s\n%s", got, want, d1, d2)
+	}
 }

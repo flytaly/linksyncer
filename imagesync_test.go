@@ -175,3 +175,44 @@ func TestRenameFile(t *testing.T) {
 		t.Errorf("got %v, want %v", iSync.Images, wantImages)
 	}
 }
+
+func TestUpdateImageLinks(t *testing.T) {
+	root := "/home/user/notes"
+	j := filepath.Join
+	filePath := j(root, "my_note.md")
+
+	imgs := []RenamedImage{{
+		prevPath: j(root, "./assets/image01.png"),
+		newPath:  j(root, "./images/image01.png"),
+		link:     "./assets/image01.png",
+	}}
+
+	content := []byte("![alt text](" + imgs[0].link + ")")
+
+	mapFS := fstest.MapFS{"my_note.md": {Data: content}}
+
+	iSync := New(mapFS, root)
+
+	fileWriterOriginal := writeFile
+
+	writtenData := ""
+
+	writeFile = func(fPath string, data []byte) error {
+		writtenData = string(data)
+		return nil
+	}
+
+	err := iSync.UpdateImageLinks(filePath, imgs)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	want := "![alt text](images/image01.png)"
+
+	if writtenData != want {
+		t.Errorf("expect %s, got %s", want, writtenData)
+	}
+
+	writeFile = fileWriterOriginal
+}

@@ -1,6 +1,7 @@
 package imagesync
 
 import (
+	"bytes"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -20,6 +21,11 @@ type ImageInfo struct {
 	absPath      string
 	originalLink string
 }
+
+type RenamedImage struct {
+	prevPath string
+	newPath  string
+	link     string
 }
 
 // return flat slice of non-empty capturing groups
@@ -83,6 +89,24 @@ func GetImagesFromFile(filePath string, content string) []ImageInfo {
 		} else {
 			result = append(result, ImageInfo{originalLink: p, absPath: p})
 		}
+	}
+
+	return result
+}
+
+func ReplaceImageLinks(filePath string, fileContent []byte, imgs []RenamedImage) []byte {
+	result := fileContent
+
+	for _, img := range imgs {
+		targpath := ""
+		if !filepath.IsAbs(img.link) {
+			targpath, _ = filepath.Rel(filepath.Dir(filePath), img.newPath)
+		}
+		if targpath == "" {
+			targpath = img.newPath
+		}
+
+		result = bytes.ReplaceAll(result, []byte(img.link), []byte(targpath))
 	}
 
 	return result

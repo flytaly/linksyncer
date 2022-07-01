@@ -3,6 +3,8 @@ package testutils
 import (
 	"reflect"
 	"testing"
+
+	"golang.org/x/exp/constraints"
 )
 
 func Compare(t *testing.T, got, want []string) {
@@ -32,4 +34,27 @@ func Difference(slice1, slice2 []string) []string {
 	}
 
 	return diff
+}
+
+func min[T constraints.Ordered](a, b T) T {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max[T constraints.Ordered](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func StringDifference(s1, s2 string) (r1, r2 string) {
+	for pos := range s1 {
+		if s1[pos] != s2[pos] {
+			return s1[max(0, pos-10):min(pos+10, len(s1))], s2[max(0, pos-10):min(pos+10, len(s2))]
+		}
+	}
+	return "", ""
 }

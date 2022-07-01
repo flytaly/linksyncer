@@ -3,6 +3,7 @@ package imagesync
 import (
 	"io/fs"
 	"log"
+	"os"
 	"path/filepath"
 )
 
@@ -27,6 +28,9 @@ func New(fileSystem fs.FS, root string) *ImageSync {
 
 var watchList = WatchList
 var extractImages = GetImagesFromFile
+var writeFile = func(filePath string, data []byte) error {
+	return os.WriteFile(filePath, data, 0644)
+}
 
 // Walks the file tree and fill Images and Files maps
 func (s *ImageSync) ProcessFiles() {
@@ -84,6 +88,22 @@ func (s *ImageSync) RenameFile(prevPath, newPath string) {
 
 	s.RemoveFile(prevPath)
 	s.AddFile(newPath)
+}
+
+func (s *ImageSync) UpdateImageLinks(filePath string, images []RenamedImage) error {
+	// TODO:  return new links and update s.Images
+
+	file, err := s.ReadFile(filePath)
+
+	if err != nil {
+		return err
+	}
+
+	updated := ReplaceImageLinks(filePath, file, images)
+
+	err = writeFile(filePath, updated)
+
+	return err
 }
 
 func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
