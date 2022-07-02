@@ -97,7 +97,7 @@ func TestRemoveFile(t *testing.T) {
 		}
 
 		wantImages := map[string][]string{
-			j(root, "assets/i1.png"): nil,
+			// j(root, "assets/i1.png"): nil,
 			j(root, "assets/i2.png"): {note2},
 		}
 		if !reflect.DeepEqual(iSync.Images, wantImages) {
@@ -191,28 +191,55 @@ func TestUpdateImageLinks(t *testing.T) {
 
 	mapFS := fstest.MapFS{"my_note.md": {Data: content}}
 
-	iSync := New(mapFS, root)
-
 	fileWriterOriginal := writeFile
+	t.Cleanup(func() {
+		writeFile = fileWriterOriginal
+	})
 
-	writtenData := ""
+	t.Run("update image links in the file", func(t *testing.T) {
+		iSync := New(mapFS, root)
+		iSync.AddFile(filePath)
+		writtenData := ""
 
-	writeFile = func(fPath string, data []byte) error {
-		writtenData = string(data)
-		return nil
-	}
+		writeFile = func(fPath string, data []byte) error {
+			writtenData = string(data)
+			return nil
+		}
 
-	err := iSync.UpdateImageLinks(filePath, imgs)
+		err := iSync.UpdateImageLinks(filePath, imgs)
 
-	if err != nil {
-		t.Error(err)
-	}
+		if err != nil {
+			t.Error(err)
+		}
 
-	want := "![alt text](images/image01.png)"
+		want := "![alt text](images/image01.png)"
 
-	if writtenData != want {
-		t.Errorf("expect %s, got %s", want, writtenData)
-	}
+		if writtenData != want {
+			t.Errorf("expect %s, got %s", want, writtenData)
+		}
+	})
 
-	writeFile = fileWriterOriginal
+	t.Run("update images in the imagesync struct", func(t *testing.T) {
+		iSync := New(mapFS, root)
+		iSync.AddFile(filePath)
+
+		writeFile = func(fPath string, data []byte) error {
+			return nil
+		}
+
+		err := iSync.UpdateImageLinks(filePath, imgs)
+		if err != nil {
+			t.Error(err)
+		}
+
+		updatedImageList := map[string][]string{}
+
+		for _, imgs := range imgs {
+			updatedImageList[imgs.newPath] = []string{filePath}
+		}
+
+		if !reflect.DeepEqual(updatedImageList, iSync.Images) {
+			t.Errorf("want %v, got %v", updatedImageList, iSync.Images)
+		}
+	})
 }

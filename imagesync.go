@@ -50,19 +50,17 @@ func (s *ImageSync) ProcessFiles() {
 
 func (s *ImageSync) AddFile(filePath string) {
 	s.Files[filePath] = []ImageInfo{}
-	s.ParseFile(filePath)
-}
-
-// Extract image paths from supported files and add them into `Images`
-func (s *ImageSync) ParseFile(filePath string) {
 	data, err := s.ReadFile(filePath)
-
 	if err != nil {
 		log.Println(err)
 		return
 	}
+	s.ParseFile(filePath, string(data))
+}
 
-	images := extractImages(filePath, string(data))
+// Extract image paths from supported files and add them into `Images`
+func (s *ImageSync) ParseFile(filePath, fileContent string) {
+	images := extractImages(filePath, fileContent)
 
 	for _, img := range images {
 		s.Images[img.absPath] = append(s.Images[img.absPath], filePath)
@@ -76,6 +74,9 @@ func (s *ImageSync) RemoveFile(filePath string) {
 		for _, image := range images {
 			if files, ok := s.Images[image.absPath]; ok {
 				s.Images[image.absPath] = filter(files, func(s string) bool { return s != filePath })
+			}
+			if len(s.Images[image.absPath]) == 0 {
+				delete(s.Images, image.absPath)
 			}
 
 		}
@@ -91,8 +92,6 @@ func (s *ImageSync) RenameFile(prevPath, newPath string) {
 }
 
 func (s *ImageSync) UpdateImageLinks(filePath string, images []RenamedImage) error {
-	// TODO:  return new links and update s.Images
-
 	file, err := s.ReadFile(filePath)
 
 	if err != nil {
@@ -102,6 +101,13 @@ func (s *ImageSync) UpdateImageLinks(filePath string, images []RenamedImage) err
 	updated := ReplaceImageLinks(filePath, file, images)
 
 	err = writeFile(filePath, updated)
+
+	if err != nil {
+		return err
+	}
+
+	s.RemoveFile(filePath)
+	s.ParseFile(filePath, string(updated))
 
 	return err
 }
