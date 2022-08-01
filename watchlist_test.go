@@ -26,6 +26,7 @@ func TestWatchList(t *testing.T) {
 	}
 
 	dirs := []string{
+		root,
 		j(root, "notes"),
 		j(root, "pages"),
 		j(root, "pages", "subfolder"),

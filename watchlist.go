@@ -30,10 +30,6 @@ func WatchList(fileSystem fs.FS, root string) (dirs []string, files []string, er
 			return nil
 		}
 
-		if name == "." {
-			return nil
-		}
-
 		if d.IsDir() {
 			// skip hidden and some other dirs
 			if shouldSkipDir(name) {

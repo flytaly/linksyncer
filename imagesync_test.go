@@ -26,9 +26,11 @@ func TestProcessFiles(t *testing.T) {
 	iSync.ProcessFiles()
 
 	wantDirs := map[string]bool{
+		root:             true,
 		j(root, "n"):     true,
 		j(root, "n/sub"): true,
 	}
+
 	if !reflect.DeepEqual(iSync.Dirs, wantDirs) {
 		t.Errorf("got %v, want %v", iSync.Dirs, wantDirs)
 	}

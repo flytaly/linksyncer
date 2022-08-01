@@ -41,11 +41,15 @@ func (s *ImageSync) ProcessFiles() {
 	}
 
 	for _, path := range dirs {
-		s.Dirs[path] = true
+		s.AddDir(path)
 	}
 	for _, path := range files {
 		s.AddFile(path)
 	}
+}
+
+func (s *ImageSync) AddDir(dirPath string) {
+	s.Dirs[dirPath] = true
 }
 
 func (s *ImageSync) AddFile(filePath string) {
