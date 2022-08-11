@@ -10,7 +10,7 @@ import (
 
 var allowedExt = regexp.MustCompile("(?i)(" + ValidFilesExtensions + ")$")
 
-func shouldSkipDir(name string) bool {
+func ShouldSkipDir(name string) bool {
 	if name == "." {
 		return false
 	}
@@ -19,6 +19,10 @@ func shouldSkipDir(name string) bool {
 }
 
 type PathList = map[string]fs.FileInfo
+
+func IsValidFileExt(name string) bool {
+	return allowedExt.MatchString(name)
+}
 
 // Returns a map of files and directories which should be watched for changes
 func WatchList(fileSystem fs.FS, root string) (dirs []string, files []string, err error) {
@@ -32,14 +36,14 @@ func WatchList(fileSystem fs.FS, root string) (dirs []string, files []string, er
 
 		if d.IsDir() {
 			// skip hidden and some other dirs
-			if shouldSkipDir(name) {
+			if ShouldSkipDir(name) {
 				return filepath.SkipDir
 			}
 			dirs = append(dirs, filepath.Join(root, path))
 			return nil
 		}
 
-		if allowedExt.MatchString(name) {
+		if IsValidFileExt(name) {
 			files = append(files, filepath.Join(root, path))
 		}
 
