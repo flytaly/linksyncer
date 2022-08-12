@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"sync"
+	"time"
 )
 
 // Event represents a single file system notification
@@ -53,14 +54,15 @@ type FsWatcher interface {
 }
 
 // New creates a new Watcher.
-func NewFsPoller(fsys fs.FS) *fsPoller {
+func NewFsPoller(fsys fs.FS, interval time.Duration) FsWatcher {
 	return &fsPoller{
-		events: make(chan Event),
-		errors: make(chan error),
-		closed: false,
-		close:  make(chan struct{}),
-		fsys:   fsys,
-		mu:     new(sync.Mutex),
-		files:  make(map[string]os.FileInfo),
+		events:   make(chan Event),
+		errors:   make(chan error),
+		closed:   false,
+		done:     make(chan struct{}),
+		fsys:     fsys,
+		interval: interval,
+		mu:       new(sync.Mutex),
+		files:    make(map[string]os.FileInfo),
 	}
 }

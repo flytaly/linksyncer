@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"imagesync/pkg/fswatcher"
 	"log"
 	"os"
+	"path/filepath"
+	"time"
 )
 
 func main() {
@@ -13,7 +14,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var done chan bool
+	watcher := fswatcher.NewFsPoller(os.DirFS(root), time.Millisecond*300)
 
-	watcher := fswatcher.NewFsPoller(os.DirFS(root))
-	fmt.Println(watcher)
+	watcher.Add(filepath.Join(root, "test_files"))
+
+	<-done
 }
