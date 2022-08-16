@@ -51,18 +51,18 @@ type FsWatcher interface {
 	Add(name string) error
 	Remove(name string) error
 	Close() error
+	Start(interal time.Duration) error
 }
 
 // New creates a new Watcher.
-func NewFsPoller(fsys fs.FS, interval time.Duration) FsWatcher {
+func NewFsPoller(fsys fs.FS) FsWatcher {
 	return &fsPoller{
-		events:   make(chan Event),
-		errors:   make(chan error),
-		closed:   false,
-		done:     make(chan struct{}),
-		fsys:     fsys,
-		interval: interval,
-		mu:       new(sync.Mutex),
-		files:    make(map[string]os.FileInfo),
+		events: make(chan Event),
+		errors: make(chan error),
+		closed: false,
+		done:   make(chan struct{}),
+		fsys:   fsys,
+		mu:     new(sync.Mutex),
+		files:  make(map[string]os.FileInfo),
 	}
 }

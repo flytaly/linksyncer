@@ -11,13 +11,13 @@ import (
 
 // fsPoller is polling implementing of FileWatcher interface
 type fsPoller struct {
-	files    map[string]os.FileInfo
-	watches  map[string]struct{}
-	events   chan Event
-	errors   chan error
-	done     chan struct{}
-	fsys     fs.FS
-	interval time.Duration
+	files   map[string]os.FileInfo
+	watches map[string]struct{}
+	events  chan Event
+	errors  chan error
+	done    chan struct{}
+	fsys    fs.FS
+	running bool
 
 	mu     *sync.Mutex
 	closed bool
@@ -38,8 +38,6 @@ func (p *fsPoller) Add(name string) error {
 
 	p.files[name] = fi
 
-	go p.watch(name)
-
 	return nil
 }
 
@@ -48,16 +46,28 @@ func (p *fsPoller) check() {
 }
 
 // watch watches item for changes until done is closed.
-func (p *fsPoller) watch(fname string) {
-	ticker := time.NewTicker(p.interval)
-	defer ticker.Stop()
+func (p *fsPoller) Start(interval time.Duration) error {
+	if interval < time.Millisecond*10 {
+		interval = time.Millisecond * 10
+	}
 
+	p.mu.Lock()
+	if p.running {
+		p.mu.Unlock()
+		return errors.New("watcher is already running")
+	}
+	p.running = true
+	p.mu.Unlock()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			fmt.Println("tick")
+
 		case <-p.done:
-			return
+			return nil
 		}
 	}
 }
@@ -72,12 +82,16 @@ func (p *fsPoller) Remove(name string) error {
 func (p *fsPoller) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if !p.running {
+		return nil
+	}
+	p.running = false
 
 	if p.closed {
 		return nil
 	}
-	p.closed = true
 	close(p.done)
+	p.closed = true
 	return nil
 }
 
