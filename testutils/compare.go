@@ -1,7 +1,6 @@
 package testutils
 
 import (
-	"reflect"
 	"testing"
 
 	"golang.org/x/exp/constraints"
@@ -9,7 +8,8 @@ import (
 
 func Compare(t *testing.T, got, want []string) {
 	t.Helper()
-	if !reflect.DeepEqual(got, want) {
+	d := Difference(got, want)
+	if len(d) > 0 {
 		t.Errorf("got %+v, want %+v", got, want)
 		t.Errorf("difference %+v", Difference(got, want))
 	}

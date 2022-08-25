@@ -55,13 +55,14 @@ type FsWatcher interface {
 }
 
 // New creates a new Watcher.
-func NewFsPoller(fsys fs.FS) FsWatcher {
+func NewFsPoller(fsys fs.FS, root string) FsWatcher {
 	return &fsPoller{
 		events: make(chan Event),
 		errors: make(chan error),
 		closed: false,
 		done:   make(chan struct{}),
 		fsys:   fsys,
+		root:   root,
 		mu:     new(sync.Mutex),
 		files:  make(map[string]os.FileInfo),
 	}

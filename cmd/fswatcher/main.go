@@ -21,9 +21,13 @@ func main() {
 	sign := make(chan os.Signal)
 	signal.Notify(sign, os.Kill, os.Interrupt)
 
-	watcher := fswatcher.NewFsPoller(os.DirFS(root))
+	watcher := fswatcher.NewFsPoller(os.DirFS(root), root)
 
-	watcher.Add(filepath.Join(root, "test_files"))
+	err = watcher.Add(filepath.Join(root, "." /* "test_files" */))
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	go watcher.Start(time.Millisecond * 500)
 

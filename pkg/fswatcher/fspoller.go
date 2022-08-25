@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
+
+const MIN_INTERVAL = time.Millisecond * 20
 
 // fsPoller is polling implementing of FileWatcher interface
 type fsPoller struct {
@@ -17,6 +20,8 @@ type fsPoller struct {
 	errors  chan error
 	done    chan struct{}
 	fsys    fs.FS
+	// path to the root directory
+	root    string
 	running bool
 
 	mu     *sync.Mutex
@@ -31,24 +36,75 @@ func (p *fsPoller) Add(name string) error {
 		return errors.New("poller is closed")
 	}
 
-	fi, err := fs.Stat(p.fsys, name)
-	if err != nil && errors.Is(err, fs.ErrNotExist) {
+	relativePath, err := filepath.Rel(p.root, name)
+	if err != nil {
 		return err
 	}
 
-	p.files[name] = fi
+	list, err := p.listDirFiles(relativePath)
+	if err != nil /* && errors.Is(err, fs.ErrNotExist) */ {
+		return err
+	}
+
+	for name, fi := range list {
+		p.files[name] = fi
+	}
 
 	return nil
 }
 
-func (p *fsPoller) check() {
+// listDirFiles returns list of the files if name is a directory,
+// if name isn't a directory then just return it.
+func (p *fsPoller) listDirFiles(name string) (map[string]os.FileInfo, error) {
+	files := map[string]os.FileInfo{}
 
+	fInfo, err := fs.Stat(p.fsys, name)
+	if err != nil {
+		return nil, err
+	}
+	files[name] = fInfo
+
+	if !fInfo.IsDir() {
+		return files, nil
+	}
+
+	dirEntires, err := fs.ReadDir(p.fsys, name)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, de := range dirEntires {
+		path := filepath.Join(name, de.Name())
+		files[path] = fInfo
+	}
+
+	return files, nil
+}
+
+// checkChanges checks folders for changes
+func (p *fsPoller) checkChanges() {
+	// files := p.WatchedList()
+	// TODO:
+	fmt.Println("check for changes", time.Now())
+}
+
+// WatchedList return list of watched files and folders
+func (p *fsPoller) WatchedList() map[string]os.FileInfo {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	files := make(map[string]os.FileInfo)
+	for k, v := range p.files {
+		files[k] = v
+	}
+
+	return files
 }
 
 // watch watches item for changes until done is closed.
 func (p *fsPoller) Start(interval time.Duration) error {
-	if interval < time.Millisecond*10 {
-		interval = time.Millisecond * 10
+	if interval < MIN_INTERVAL {
+		interval = MIN_INTERVAL
 	}
 
 	p.mu.Lock()
@@ -64,7 +120,7 @@ func (p *fsPoller) Start(interval time.Duration) error {
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Println("tick")
+			p.checkChanges()
 
 		case <-p.done:
 			return nil

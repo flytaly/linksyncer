@@ -2,8 +2,10 @@ package fswatcher
 
 import (
 	"errors"
+	"imagesync/testutils"
 	"io/fs"
 	"os"
+	"path"
 	"reflect"
 	"sync"
 	"testing"
@@ -11,7 +13,7 @@ import (
 	"time"
 )
 
-func makePoller(fsys fs.FS) *fsPoller {
+func makePoller(fsys fs.FS, root string) *fsPoller {
 	return &fsPoller{
 		events: make(chan Event),
 		errors: make(chan error),
@@ -19,15 +21,21 @@ func makePoller(fsys fs.FS) *fsPoller {
 		done:   make(chan struct{}),
 		fsys:   fsys,
 		mu:     new(sync.Mutex),
+		root:   root,
 		files:  make(map[string]os.FileInfo),
 	}
 }
 
+var j = path.Join
+
 func TestAdd(t *testing.T) {
 	t.Run("add files", func(t *testing.T) {
-		var err error
+		root := "path"
 
-		files := []string{"path/note.md", "path/some_dir"}
+		files := []string{
+			j(root, "note.md"),
+			j(root, "some_dir/note2.md"),
+		}
 
 		ff := map[string]*fstest.MapFile{}
 
@@ -38,26 +46,24 @@ func TestAdd(t *testing.T) {
 		}
 
 		fsys := fstest.MapFS(ff)
-		p := makePoller(fsys)
+		p := makePoller(fsys, root)
 
-		want := map[string]os.FileInfo{}
-
-		for _, v := range files {
-			p.Add(v)
-			want[v], err = fsys.Stat(v)
-			if err != nil {
-				t.Error(err)
-			}
+		err := p.Add(j(root, "path"))
+		if err != nil {
+			t.Error(err)
 		}
 
-		if !reflect.DeepEqual(want, p.files) {
-			t.Errorf("length: want %s, got %s", want, p.files)
+		want := []string{root, j(root, "note.md"), j(root, "some_dir")}
+		got := []string{}
+		for name := range p.files {
+			got = append(got, name)
 		}
 
+		testutils.Compare(t, got, want)
 	})
 
 	t.Run("emit error if closed", func(t *testing.T) {
-		p := makePoller(fstest.MapFS{})
+		p := makePoller(fstest.MapFS{}, ".")
 		p.closed = true
 		err := p.Add("file")
 
@@ -68,7 +74,7 @@ func TestAdd(t *testing.T) {
 	})
 
 	t.Run("file is not exist", func(t *testing.T) {
-		p := makePoller(fstest.MapFS{})
+		p := makePoller(fstest.MapFS{}, ".")
 		err := p.Add("some_folder")
 		if !errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("Should throw error. %s", err)
@@ -82,7 +88,7 @@ func TestRemove(t *testing.T) {
 			"path1": {Data: []byte("")},
 			"path2": {Data: []byte("")},
 		}
-		p := makePoller(fsys)
+		p := makePoller(fsys, ".")
 		p.Add("path1")
 		p.Add("path2")
 		p.Remove("path1")
@@ -96,7 +102,7 @@ func TestRemove(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	fsys := fstest.MapFS{"some_path": {Data: []byte("")}}
-	p := makePoller(fsys)
+	p := makePoller(fsys, ".")
 	go p.Start(time.Second)
 
 	time.Sleep(time.Millisecond)
