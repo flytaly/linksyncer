@@ -15,6 +15,41 @@ func Compare(t *testing.T, got, want []string) {
 	}
 }
 
+func CompareMapKeys[V any](t *testing.T, got map[string]V, wantKeys []string) {
+	diff := []string{}
+
+	gotKeys := make([]string, 0, len(got))
+	for k := range got {
+		gotKeys = append(gotKeys, k)
+	}
+
+	wantMap := map[string]bool{}
+	for _, v := range wantKeys {
+		wantMap[v] = true
+	}
+
+	if len(gotKeys) > len(wantKeys) {
+		for _, v := range gotKeys {
+			if !wantMap[v] {
+				diff = append(diff, v)
+			}
+		}
+		t.Errorf("got %+v, want %+v", gotKeys, wantKeys)
+		t.Errorf("excessive elements: %+v", diff)
+		return
+	}
+
+	for _, v := range wantKeys {
+		if _, ok := got[v]; !ok {
+			diff = append(diff, v)
+		}
+	}
+	if len(diff) > 0 {
+		t.Errorf("got %+v, want %+v", got, wantKeys)
+		t.Errorf("missing %+v", diff)
+	}
+}
+
 // Difference between two slices
 func Difference(slice1, slice2 []string) []string {
 	diff := []string{}
