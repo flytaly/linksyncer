@@ -51,7 +51,7 @@ type FsWatcher interface {
 	Add(name string) error
 	Remove(name string) error
 	Close() error
-	Start(interal time.Duration) error
+	Start(interval time.Duration) error
 }
 
 // New creates a new Watcher.

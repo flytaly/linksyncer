@@ -2,7 +2,6 @@ package fswatcher
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -60,7 +59,7 @@ func (p *fsPoller) Add(name string) error {
 }
 
 // listDirFiles returns list of the files if name is a directory,
-// if name isn't a directory then just return it.
+// if name isn't a directory then just returns it's FileInfo.
 func (p *fsPoller) listDirFiles(name string) (map[string]os.FileInfo, error) {
 	files := map[string]os.FileInfo{}
 
@@ -87,11 +86,30 @@ func (p *fsPoller) listDirFiles(name string) (map[string]os.FileInfo, error) {
 	return files, nil
 }
 
-// checkChanges checks folders for changes
-func (p *fsPoller) checkChanges() {
-	// files := p.WatchedList()
-	// TODO:
-	fmt.Println("check for changes", time.Now())
+// scanForChanges checks folders for changes
+func (p *fsPoller) scanForChanges() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for path := range p.watches {
+		files, err := p.listDirFiles(path)
+		if err != nil {
+			p.errors <- err
+			continue
+		}
+		p.compareFiles(path, files)
+
+	}
+
+}
+
+// compareFiles compares new files from the folder path with the old
+func (p *fsPoller) compareFiles(path string, newFiles map[string]os.FileInfo) {
+	for file := range newFiles {
+		if _, exists := p.files[file]; !exists {
+			p.events <- Event{Op: Create, Name: file}
+		}
+	}
 }
 
 // WatchedList return list of watched files and folders
@@ -121,16 +139,9 @@ func (p *fsPoller) Start(interval time.Duration) error {
 	p.running = true
 	p.mu.Unlock()
 
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
 	for {
-		select {
-		case <-ticker.C:
-			p.checkChanges()
-
-		case <-p.done:
-			return nil
-		}
+		p.scanForChanges()
+		time.Sleep(interval)
 	}
 }
 

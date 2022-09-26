@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"imagesync/pkg/fswatcher"
 	"log"
 	"os"
@@ -28,6 +29,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	go func() {
+		for {
+			select {
+			case event := <-watcher.Events():
+				fmt.Println(event, event.Name) // Print the event's info.
+			case err := <-watcher.Errors():
+				log.Fatalln(err)
+			}
+		}
+	}()
 
 	go watcher.Start(time.Second * 1)
 

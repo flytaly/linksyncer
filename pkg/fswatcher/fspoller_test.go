@@ -12,6 +12,8 @@ import (
 	"testing"
 	"testing/fstest"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func makePoller(fsys fs.FS, root string) *fsPoller {
@@ -27,6 +29,8 @@ func makePoller(fsys fs.FS, root string) *fsPoller {
 		watches: map[string]struct{}{},
 	}
 }
+
+var minWait = MIN_INTERVAL + time.Millisecond*5
 
 var j = path.Join
 
@@ -129,6 +133,69 @@ func TestClose(t *testing.T) {
 		}
 	}
 
+}
+
+func TestEvent(t *testing.T) {
+	t.Run("CREATE", func(t *testing.T) {
+		files := createFS([]string{"file"})
+		p := makePoller(files, ".")
+		failIfErr(t, p.Add("."))
+
+		newFiles := map[string]string{ // path => event's filename
+			"newFile1.txt":       "newFile1.txt",
+			"newFile2.txt":       "newFile2.txt",
+			"newFolder/file.txt": "newFolder",
+		}
+
+		evs := map[string]Event{}
+		for _, name := range newFiles {
+			evs[name] = Event{Op: Create, Name: name}
+		}
+		ExpectEvents(t, p, minWait, evs)
+
+		go p.Start(0)
+
+		go func() {
+			time.Sleep(time.Millisecond * 2)
+			for path := range newFiles {
+				files[path] = &fstest.MapFile{}
+			}
+		}()
+
+		<-p.done
+
+		// TODO: add new files to p.files
+	})
+
+}
+
+func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[string]Event) {
+	gotEvents := map[string]Event{}
+
+	check := func() {
+		assert.Equal(t, gotEvents, want, "should trigger events")
+		p.Close()
+	}
+
+	go func() {
+		for {
+			select {
+			case event := <-p.Events():
+				gotEvents[event.Name] = event
+				if len(want) == len(gotEvents) {
+					check()
+				}
+			case err := <-p.Errors():
+				t.Error(err)
+			}
+		}
+	}()
+
+	go func() {
+		time.Sleep(await)
+		t.Errorf("Events were not triggered in time")
+		check()
+	}()
 }
 
 func failIfErr(t *testing.T, err error) {
