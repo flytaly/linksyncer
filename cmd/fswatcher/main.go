@@ -29,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go watcher.Start(time.Millisecond * 500)
+	go watcher.Start(time.Second * 1)
 
 	go func() {
 		<-sign

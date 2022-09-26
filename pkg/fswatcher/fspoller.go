@@ -14,12 +14,14 @@ const MIN_INTERVAL = time.Millisecond * 20
 
 // fsPoller is polling implementing of FileWatcher interface
 type fsPoller struct {
-	files   map[string]os.FileInfo
+	// watched files and dirs
 	watches map[string]struct{}
-	events  chan Event
-	errors  chan error
-	done    chan struct{}
-	fsys    fs.FS
+	// files and dirs inside watched paths
+	files  map[string]os.FileInfo
+	events chan Event
+	errors chan error
+	done   chan struct{}
+	fsys   fs.FS
 	// path to the root directory
 	root    string
 	running bool
@@ -28,6 +30,8 @@ type fsPoller struct {
 	closed bool
 }
 
+// Add adds given name into the list of the watched paths
+// and saves FileInfo of nested files
 func (p *fsPoller) Add(name string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -46,9 +50,11 @@ func (p *fsPoller) Add(name string) error {
 		return err
 	}
 
-	for name, fi := range list {
-		p.files[name] = fi
+	for fname, fi := range list {
+		p.files[fname] = fi
 	}
+
+	p.watches[relativePath] = struct{}{}
 
 	return nil
 }

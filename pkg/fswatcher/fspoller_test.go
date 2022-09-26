@@ -15,51 +15,73 @@ import (
 
 func makePoller(fsys fs.FS, root string) *fsPoller {
 	return &fsPoller{
-		events: make(chan Event),
-		errors: make(chan error),
-		closed: false,
-		done:   make(chan struct{}),
-		fsys:   fsys,
-		mu:     new(sync.Mutex),
-		root:   root,
-		files:  make(map[string]os.FileInfo),
+		events:  make(chan Event),
+		errors:  make(chan error),
+		closed:  false,
+		done:    make(chan struct{}),
+		fsys:    fsys,
+		mu:      new(sync.Mutex),
+		root:    root,
+		files:   make(map[string]os.FileInfo),
+		watches: map[string]struct{}{},
 	}
 }
 
 var j = path.Join
 
+// return fs with empty files from a slice with filenames
+func createFS(files []string) *fstest.MapFS {
+	ff := map[string]*fstest.MapFile{}
+	for _, v := range files {
+		ff[v] = &fstest.MapFile{Data: nil}
+	}
+	fsys := fstest.MapFS(ff)
+
+	return &fsys
+}
+
 func TestAdd(t *testing.T) {
 	t.Run("add files", func(t *testing.T) {
 		root := "path"
 
-		files := []string{
-			j(root, "note.md"),
-			j(root, "some_dir/note2.md"),
+		fsys := createFS([]string{
+			j(root, "notes", "note.md"),
+			j(root, "notes", "some_dir", "note2.md"),
+			j(root, "notes", "ignored_dir", "ignored.md"),
+		})
+
+		fileList := []string{
+			j(root, "notes"),
+			j(root, "notes", "note.md"),
+			j(root, "notes", "some_dir"),
+			j(root, "notes", "some_dir", "note2.md"),
+			j(root, "notes", "ignored_dir"),
 		}
 
-		ff := map[string]*fstest.MapFile{}
+		watches := map[string]struct{}{
+			j(root, "notes"):             {},
+			j(root, "notes", "some_dir"): {},
+		}
 
-		for _, v := range files {
-			ff[v] = &fstest.MapFile{
-				Data: nil,
+		p := makePoller(fsys, ".")
+
+		for name := range watches {
+			err := p.Add(name)
+			if err != nil {
+				t.Error(err)
 			}
 		}
 
-		fsys := fstest.MapFS(ff)
-		p := makePoller(fsys, root)
-
-		err := p.Add(j(root, "path"))
-		if err != nil {
-			t.Error(err)
-		}
-
-		want := []string{root, j(root, "note.md"), j(root, "some_dir")}
 		got := []string{}
 		for name := range p.files {
 			got = append(got, name)
 		}
 
-		testutils.Compare(t, got, want)
+		testutils.Compare(t, got, fileList)
+
+		if !reflect.DeepEqual(p.watches, watches) {
+			t.Errorf("watches: got %v, want %v", p.watches, watches)
+		}
 	})
 
 	t.Run("emit error if closed", func(t *testing.T) {
@@ -84,10 +106,7 @@ func TestAdd(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	t.Run("remove file", func(t *testing.T) {
-		fsys := fstest.MapFS{
-			"path1": {Data: []byte("")},
-			"path2": {Data: []byte("")},
-		}
+		fsys := createFS([]string{"path1", "path2"})
 		p := makePoller(fsys, ".")
 		p.Add("path1")
 		p.Add("path2")
@@ -101,7 +120,7 @@ func TestRemove(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	fsys := fstest.MapFS{"some_path": {Data: []byte("")}}
+	fsys := createFS([]string{"some_path"})
 	p := makePoller(fsys, ".")
 	go p.Start(time.Second)
 
