@@ -78,7 +78,6 @@ func TestAdd(t *testing.T) {
 		}
 
 		testutils.CompareMapKeys(t, p.files, fileList)
-
 	})
 
 	t.Run("emit error if closed", func(t *testing.T) {
@@ -137,8 +136,8 @@ func TestClose(t *testing.T) {
 
 func TestEvent(t *testing.T) {
 	t.Run("CREATE", func(t *testing.T) {
-		files := createFS([]string{"file"})
-		p := makePoller(files, ".")
+		fsys := createFS([]string{"file"})
+		p := makePoller(fsys, ".")
 		failIfErr(t, p.Add("."))
 
 		newFiles := map[string]string{ // path => event's filename
@@ -158,13 +157,15 @@ func TestEvent(t *testing.T) {
 		go func() {
 			time.Sleep(time.Millisecond * 2)
 			for path := range newFiles {
-				files[path] = &fstest.MapFile{}
+				fsys[path] = &fstest.MapFile{}
 			}
 		}()
 
 		<-p.done
 
-		// TODO: add new files to p.files
+		for _, f := range newFiles {
+			assert.Contains(t, p.files, f, "should contain path: %s", f)
+		}
 	})
 
 }

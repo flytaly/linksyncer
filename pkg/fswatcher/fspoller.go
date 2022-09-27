@@ -97,17 +97,18 @@ func (p *fsPoller) scanForChanges() {
 			p.errors <- err
 			continue
 		}
-		p.compareFiles(path, files)
+		p.checkDiffs(path, files)
 
 	}
 
 }
 
-// compareFiles compares new files from the folder path with the old
-func (p *fsPoller) compareFiles(path string, newFiles map[string]os.FileInfo) {
+// checkDiffs compares new files from the folder path with the old
+func (p *fsPoller) checkDiffs(path string, newFiles map[string]os.FileInfo) {
 	for file := range newFiles {
-		if _, exists := p.files[file]; !exists {
+		if info, exists := p.files[file]; !exists {
 			p.events <- Event{Op: Create, Name: file}
+			p.files[file] = info
 		}
 	}
 }
