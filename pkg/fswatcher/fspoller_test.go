@@ -25,7 +25,7 @@ func makePoller(fsys fs.FS, root string) *fsPoller {
 		fsys:    fsys,
 		mu:      new(sync.Mutex),
 		root:    root,
-		files:   make(map[string]os.FileInfo),
+		files:   make(map[string]*os.FileInfo),
 		watches: map[string]struct{}{},
 	}
 }
@@ -107,12 +107,10 @@ func TestRemove(t *testing.T) {
 		failIfErr(t, p.Add("path1"))
 		failIfErr(t, p.Add("path2"))
 		failIfErr(t, p.Remove("path1"))
-		stat, err := fsys.Stat("path2")
+		_, err := fsys.Stat("path2")
 		failIfErr(t, err)
-		want := map[string]os.FileInfo{"path2": stat}
-		if !reflect.DeepEqual(p.files, want) {
-			t.Errorf("got %s, want %s", p.files, want)
-		}
+		assert.Contains(t, p.files, "path2")
+		assert.NotContains(t, p.files, "path1")
 	})
 }
 
@@ -168,6 +166,34 @@ func TestEvent(t *testing.T) {
 		}
 	})
 
+	t.Run("REMOVE", func(t *testing.T) {
+		fsys := createFS([]string{"file1.txt", "file2.txt", "file3.txt"})
+		p := makePoller(fsys, ".")
+		failIfErr(t, p.Add("."))
+
+		remove := []string{"file2.txt"}
+
+		evs := map[string]Event{}
+		for _, name := range remove {
+			evs[name] = Event{Op: Remove, Name: name}
+		}
+		ExpectEvents(t, p, minWait, evs)
+
+		go p.Start(0)
+
+		go func() {
+			time.Sleep(time.Millisecond * 2)
+			for _, path := range remove {
+				delete(fsys, path)
+			}
+		}()
+
+		<-p.done
+
+		for _, f := range remove {
+			assert.NotContains(t, p.files, f, "shouldn't contain removed path: %s", f)
+		}
+	})
 }
 
 func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[string]Event) {
@@ -188,14 +214,18 @@ func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[strin
 				}
 			case err := <-p.Errors():
 				t.Error(err)
+			case <-p.done:
+				return
 			}
 		}
 	}()
 
 	go func() {
 		time.Sleep(await)
-		t.Errorf("Events were not triggered in time")
-		check()
+		if !p.closed {
+			t.Errorf("Events were not triggered in time")
+			check()
+		}
 	}()
 }
 

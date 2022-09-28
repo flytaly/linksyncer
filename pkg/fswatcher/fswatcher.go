@@ -2,7 +2,6 @@ package fswatcher
 
 import (
 	"io/fs"
-	"os"
 	"sync"
 	"time"
 )
@@ -65,6 +64,6 @@ func NewFsPoller(fsys fs.FS, root string) FsWatcher {
 		root:    root,
 		watches: map[string]struct{}{},
 		mu:      new(sync.Mutex),
-		files:   make(map[string]os.FileInfo),
+		files:   make(map[string]*fs.FileInfo),
 	}
 }

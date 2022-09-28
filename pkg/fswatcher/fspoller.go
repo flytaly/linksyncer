@@ -3,7 +3,6 @@ package fswatcher
 import (
 	"errors"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -16,7 +15,7 @@ type fsPoller struct {
 	// watched files and dirs
 	watches map[string]struct{}
 	// files and dirs inside watched paths
-	files  map[string]os.FileInfo
+	files  map[string]*fs.FileInfo
 	events chan Event
 	errors chan error
 	done   chan struct{}
@@ -60,14 +59,14 @@ func (p *fsPoller) Add(name string) error {
 
 // listDirFiles returns list of the files if name is a directory,
 // if name isn't a directory then just returns it's FileInfo.
-func (p *fsPoller) listDirFiles(name string) (map[string]os.FileInfo, error) {
-	files := map[string]os.FileInfo{}
+func (p *fsPoller) listDirFiles(name string) (map[string]*fs.FileInfo, error) {
+	files := map[string]*fs.FileInfo{}
 
 	fInfo, err := fs.Stat(p.fsys, name)
 	if err != nil {
 		return nil, err
 	}
-	files[name] = fInfo
+	files[name] = &fInfo
 
 	if !fInfo.IsDir() {
 		return files, nil
@@ -80,7 +79,7 @@ func (p *fsPoller) listDirFiles(name string) (map[string]os.FileInfo, error) {
 
 	for _, de := range dirEntires {
 		path := filepath.Join(name, de.Name())
-		files[path] = fInfo
+		files[path] = &fInfo
 	}
 
 	return files, nil
@@ -91,34 +90,56 @@ func (p *fsPoller) scanForChanges() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	addedFiles := map[string]*fs.FileInfo{}
+	updated := map[string]*fs.FileInfo{}
+
 	for path := range p.watches {
 		files, err := p.listDirFiles(path)
 		if err != nil {
 			p.errors <- err
 			continue
 		}
-		p.checkDiffs(path, files)
-
+		p.separate(files, addedFiles, updated)
 	}
 
+	if len(updated) > 0 {
+		for name := range p.files {
+			newInfo, has := updated[name]
+			if has { // File was updated
+				p.files[name] = newInfo // Compare
+				continue
+			}
+			// file was deleted or renamed
+			// TODO: rename event
+			p.events <- Event{Op: Remove, Name: name}
+			delete(p.files, name)
+		}
+	}
+
+	for name, info := range addedFiles {
+		p.files[name] = info
+		p.events <- Event{Op: Create, Name: name}
+	}
 }
 
-// checkDiffs compares new files from the folder path with the old
-func (p *fsPoller) checkDiffs(path string, newFiles map[string]os.FileInfo) {
+// separate splits files into 2 categories: added and updated
+func (p *fsPoller) separate(newFiles, added, updated map[string]*fs.FileInfo) {
 	for file := range newFiles {
-		if info, exists := p.files[file]; !exists {
-			p.events <- Event{Op: Create, Name: file}
-			p.files[file] = info
+		info, exists := p.files[file]
+		if !exists {
+			added[file] = info
+			continue
 		}
+		updated[file] = info
 	}
 }
 
 // WatchedList return list of watched files and folders
-func (p *fsPoller) WatchedList() map[string]os.FileInfo {
+func (p *fsPoller) WatchedList() map[string]*fs.FileInfo {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	files := make(map[string]os.FileInfo)
+	files := make(map[string]*fs.FileInfo)
 	for k, v := range p.files {
 		files[k] = v
 	}
@@ -142,7 +163,9 @@ func (p *fsPoller) Start(interval time.Duration) error {
 
 	for {
 		p.scanForChanges()
-		time.Sleep(interval)
+		if !p.closed {
+			time.Sleep(interval)
+		}
 	}
 }
 
