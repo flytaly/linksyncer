@@ -123,8 +123,10 @@ func (p *fsPoller) scanForChanges() {
 
 // onFileWrite checks if file with given path was changed, if positive triggers Write event
 func (p *fsPoller) onFileWrite(path string, oldFi, newFi *fs.FileInfo) {
-	// TODO:
-	p.files[path] = newFi
+	if (*oldFi).ModTime() != (*newFi).ModTime() {
+		p.files[path] = newFi
+		p.sendEvent(Event{Op: Write, Name: path})
+	}
 }
 
 // onFileRemove evaluates if path was removed or renamed and trigger corresponding event
@@ -132,8 +134,8 @@ func (p *fsPoller) onFileRemove(path string, created map[string]*fs.FileInfo, ol
 	delete(p.files, path)
 	for newPath, newFi := range created {
 		if sameFile(*oldFi, *newFi) {
-			p.sendEvent(Event{Op: Rename, Name: path, NewPath: newPath})
 			p.files[newPath] = newFi
+			p.sendEvent(Event{Op: Rename, Name: path, NewPath: newPath})
 			delete(created, newPath)
 			return
 		}

@@ -226,6 +226,36 @@ func TestEvent(t *testing.T) {
 			assert.Contains(t, p.files, to, "should contain renamed path")
 		}
 	})
+
+	t.Run("WRITE", func(t *testing.T) {
+		fsys := createFS([]string{"file1.txt", "file2.txt"})
+		p := makePoller(fsys, ".")
+		failIfErr(t, p.Add("."))
+
+		write := []string{"file2.txt"}
+
+		evs := map[string]Event{}
+		for _, name := range write {
+			evs[name] = Event{Op: Write, Name: name}
+		}
+		ExpectEvents(t, p, minWait, evs)
+
+		go p.Start(0)
+
+		go func() {
+			time.Sleep(time.Millisecond * 2)
+			for _, path := range write {
+				fsys[path] = &fstest.MapFile{} // create new reference
+				fsys[path].ModTime = fsys[path].ModTime.Add(time.Second)
+			}
+		}()
+
+		<-p.done
+
+		for _, name := range write {
+			assert.Contains(t, p.files, name, "should contain renamed path")
+		}
+	})
 }
 
 func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[string]Event) {
