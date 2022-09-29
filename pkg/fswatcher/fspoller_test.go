@@ -322,6 +322,29 @@ func TestEvent(t *testing.T) {
 	})
 }
 
+func TestShouldSkipHook(t *testing.T) {
+	t.Run("skip files", func(t *testing.T) {
+		skip := []string{"node_modules", "movie.mp4", "skip.txt"}
+		noskip := []string{"note.md"}
+		fsys := createFS(noskip)
+		for _, f := range skip {
+			fsys[f] = &fstest.MapFile{}
+		}
+		p := makePoller(fsys, ".")
+		p.AddShouldSkipHook(func(fi fs.FileInfo) bool {
+			return filepath.Ext(fi.Name()) != ".md"
+		})
+		failIfErr(t, p.Add("."))
+
+		for _, f := range skip {
+			assert.NotContains(t, p.files, f)
+		}
+		for _, f := range noskip {
+			assert.Contains(t, p.files, f)
+		}
+	})
+}
+
 func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[string]Event) {
 	gotEvents := map[string]Event{}
 

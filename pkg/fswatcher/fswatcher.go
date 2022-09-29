@@ -22,7 +22,6 @@ const (
 	Write
 	Remove
 	Rename
-	Move
 	Chmod
 )
 
@@ -36,8 +35,6 @@ func (op Op) String() string {
 		return "REMOVE"
 	case Rename:
 		return "RENAME"
-	case Move:
-		return "MOVE"
 	case Chmod:
 		return "CHMOD"
 	}
@@ -52,6 +49,7 @@ type FsWatcher interface {
 	Remove(name string) error
 	Close() error
 	Start(interval time.Duration) error
+	AddShouldSkipHook(func(fi fs.FileInfo) bool)
 }
 
 // New creates a new Watcher.

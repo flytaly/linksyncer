@@ -11,22 +11,27 @@ import (
 
 const MIN_INTERVAL = time.Millisecond * 20
 
-// fsPoller is polling implementing of FileWatcher interface
+// fsPoller is polling implementation of FileWatcher interface
 type fsPoller struct {
 	// watched files and dirs
 	watches map[string]struct{}
-	// files and dirs inside watched paths
-	files  map[string]*fs.FileInfo
-	events chan Event
-	errors chan error
-	done   chan struct{}
-	fsys   fs.FS
+	// stores info about files and dirs inside watched paths
+	files      map[string]*fs.FileInfo
+	events     chan Event
+	errors     chan error
+	done       chan struct{}
+	shouldSkip func(fs.FileInfo) bool
+	fsys       fs.FS
 	// path to the root directory
 	root    string
 	running bool
 
 	mu     *sync.Mutex
 	closed bool
+}
+
+func (p *fsPoller) AddShouldSkipHook(fn func(fs.FileInfo) bool) {
+	p.shouldSkip = fn
 }
 
 // Add adds given name into the list of the watched paths
@@ -81,9 +86,13 @@ func (p *fsPoller) listDirFiles(name string) (map[string]*fs.FileInfo, error) {
 	for _, de := range dirEntires {
 		path := filepath.Join(name, de.Name())
 		stat, err := de.Info()
-		if err == nil {
-			files[path] = &stat
+		if err != nil {
+			continue
 		}
+		if p.shouldSkip != nil && p.shouldSkip(stat) { // skip
+			continue
+		}
+		files[path] = &stat
 	}
 
 	return files, nil
