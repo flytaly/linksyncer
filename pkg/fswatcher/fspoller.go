@@ -100,6 +100,10 @@ func (p *fsPoller) scanForChanges() {
 	for path := range p.watches {
 		files, err := p.listDirFiles(path)
 		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				p.onWatchedPathRemoved(path)
+				continue
+			}
 			p.errors <- err
 			continue
 		}
@@ -118,6 +122,20 @@ func (p *fsPoller) scanForChanges() {
 	for name, info := range addedFiles {
 		p.files[name] = info
 		p.sendEvent(Event{Op: Create, Name: name})
+	}
+}
+
+// onWatchedPathRemoved removes path from watched paths and of its files/subfolder
+func (p *fsPoller) onWatchedPathRemoved(path string) {
+	delete(p.watches, path)
+	info := p.files[path]
+	if info != nil && !(*info).IsDir() {
+		return
+	}
+	for file := range p.files {
+		if filepath.Dir(file) == path {
+			delete(p.files, file)
+		}
 	}
 }
 
