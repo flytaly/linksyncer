@@ -24,7 +24,7 @@ func main() {
 
 	watcher := fswatcher.NewFsPoller(os.DirFS(root), root)
 
-	err = watcher.Add(filepath.Join(root, "." /* "test_files" */))
+	err = watcher.Add(filepath.Join(root, "/test_files"))
 
 	if err != nil {
 		log.Fatal(err)
@@ -34,7 +34,7 @@ func main() {
 		for {
 			select {
 			case event := <-watcher.Events():
-				fmt.Println(event, event.Name) // Print the event's info.
+				fmt.Printf("Event: %s, Path: %s, NewPath: %s\n", event.Op, event.Name, event.NewPath) // Print the event's info.
 			case err := <-watcher.Errors():
 				log.Fatalln(err)
 			}

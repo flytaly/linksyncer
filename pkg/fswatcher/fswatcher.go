@@ -8,8 +8,9 @@ import (
 
 // Event represents a single file system notification
 type Event struct {
-	Name string // Path to the file or directory
-	Op   Op     // File operation that triggered the event.
+	Name    string // Path to the file or directory
+	NewPath string // new path after rename operation
+	Op      Op     // File operation that triggered the event.
 }
 
 // Op describes a type of event

@@ -204,8 +204,8 @@ func TestEvent(t *testing.T) {
 		rename := map[string]string{"file2.txt": "renamed.txt"}
 
 		evs := map[string]Event{}
-		for from := range rename {
-			evs[from] = Event{Op: Rename, Name: from}
+		for from, to := range rename {
+			evs[from] = Event{Op: Rename, Name: from, NewPath: to}
 		}
 		ExpectEvents(t, p, minWait, evs)
 
