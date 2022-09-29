@@ -133,6 +133,7 @@ func TestClose(t *testing.T) {
 }
 
 func TestEvent(t *testing.T) {
+
 	t.Run("CREATE", func(t *testing.T) {
 		fsys := createFS([]string{"file"})
 		p := makePoller(fsys, ".")
@@ -194,6 +195,37 @@ func TestEvent(t *testing.T) {
 			assert.NotContains(t, p.files, f, "shouldn't contain removed path: %s", f)
 		}
 	})
+
+	t.Run("RENAME", func(t *testing.T) {
+		fsys := createFS([]string{"file1.txt", "file2.txt"})
+		p := makePoller(fsys, ".")
+		failIfErr(t, p.Add("."))
+
+		rename := map[string]string{"file2.txt": "renamed.txt"}
+
+		evs := map[string]Event{}
+		for from := range rename {
+			evs[from] = Event{Op: Rename, Name: from}
+		}
+		ExpectEvents(t, p, minWait, evs)
+
+		go p.Start(0)
+
+		go func() {
+			time.Sleep(time.Millisecond * 2)
+			for from, to := range rename {
+				fsys[to] = fsys[from]
+				delete(fsys, from)
+			}
+		}()
+
+		<-p.done
+
+		for from, to := range rename {
+			assert.NotContains(t, p.files, from, "shouldn't contain removed path")
+			assert.Contains(t, p.files, to, "should contain renamed path")
+		}
+	})
 }
 
 func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[string]Event) {
@@ -201,7 +233,7 @@ func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[strin
 
 	check := func() {
 		assert.Equal(t, gotEvents, want, "should trigger events")
-		p.Close()
+		go p.Close()
 	}
 
 	go func() {
@@ -214,6 +246,7 @@ func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[strin
 				}
 			case err := <-p.Errors():
 				t.Error(err)
+				go p.Close()
 			case <-p.done:
 				return
 			}

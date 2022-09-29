@@ -2,6 +2,7 @@ package fswatcher
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"path/filepath"
 	"sync"
@@ -79,7 +80,10 @@ func (p *fsPoller) listDirFiles(name string) (map[string]*fs.FileInfo, error) {
 
 	for _, de := range dirEntires {
 		path := filepath.Join(name, de.Name())
-		files[path] = &fInfo
+		stat, err := de.Info()
+		if err == nil {
+			files[path] = &stat
+		}
 	}
 
 	return files, nil
@@ -102,30 +106,52 @@ func (p *fsPoller) scanForChanges() {
 		p.separate(files, addedFiles, updated)
 	}
 
-	if len(updated) > 0 {
-		for name := range p.files {
-			newInfo, has := updated[name]
-			if has { // File was updated
-				p.files[name] = newInfo // Compare
-				continue
-			}
-			// file was deleted or renamed
-			// TODO: rename event
-			p.events <- Event{Op: Remove, Name: name}
-			delete(p.files, name)
+	for path, oldInfo := range p.files {
+		newInfo, existed := updated[path]
+		if existed {
+			p.onFileWrite(path, oldInfo, newInfo)
+			continue
 		}
+		// addedFiles could contain nil info
+		p.onFileRemove(path, addedFiles, oldInfo)
 	}
 
 	for name, info := range addedFiles {
 		p.files[name] = info
-		p.events <- Event{Op: Create, Name: name}
+		p.sendEvent(Event{Op: Create, Name: name})
 	}
+}
+
+func (p *fsPoller) onFileWrite(path string, oldFi, newFi *fs.FileInfo) {
+	// TODO:
+	p.files[path] = newFi
+}
+
+func (p *fsPoller) onFileRemove(path string, created map[string]*fs.FileInfo, oldFi *fs.FileInfo) {
+	delete(p.files, path)
+	for _, info := range created {
+		if sameFile(*oldFi, *info) {
+			p.sendEvent(Event{Op: Rename, Name: path})
+			delete(created, path)
+			return
+		}
+	}
+	p.sendEvent(Event{Op: Remove, Name: path})
+}
+
+func (p *fsPoller) sendEvent(e Event) error {
+	select {
+	case p.events <- e:
+	case <-p.done:
+		return fmt.Errorf("watcher is closed")
+	}
+	return nil
 }
 
 // separate splits files into 2 categories: added and updated
 func (p *fsPoller) separate(newFiles, added, updated map[string]*fs.FileInfo) {
-	for file := range newFiles {
-		info, exists := p.files[file]
+	for file, info := range newFiles {
+		_, exists := p.files[file]
 		if !exists {
 			added[file] = info
 			continue
@@ -162,10 +188,13 @@ func (p *fsPoller) Start(interval time.Duration) error {
 	p.mu.Unlock()
 
 	for {
-		p.scanForChanges()
-		if !p.closed {
-			time.Sleep(interval)
+		time.Sleep(interval)
+
+		if p.closed {
+			return nil
 		}
+
+		p.scanForChanges()
 	}
 }
 
