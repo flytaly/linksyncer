@@ -205,12 +205,12 @@ func TestEvent(t *testing.T) {
 		pathToRemove := []string{"tempFile.txt", "temp"}
 		p := makePoller(fsys, ".")
 		failIfErr(t, p.Add("."))
-		for _, f := range pathToRemove {
-			failIfErr(t, p.Add(f))
-		}
 
 		evs := map[string]Event{}
-		evs["temp"] = Event{Op: Remove, Name: "temp"}
+		for _, f := range pathToRemove {
+			failIfErr(t, p.Add(f))
+			evs[f] = Event{Op: Remove, Name: f}
+		}
 		ExpectEvents(t, p, minWait, evs)
 
 		go p.Start(0)
@@ -228,6 +228,8 @@ func TestEvent(t *testing.T) {
 			assert.NotContainsf(t, p.files, f, "shouldn't contain removed path")
 			assert.NotContainsf(t, p.watches, f, "shouldn't watch removed path")
 		}
+
+		assert.NotContainsf(t, p.files, j("temp", "file2.png"), "shouldn't contain removed file")
 	})
 
 	t.Run("RENAME", func(t *testing.T) {
@@ -259,6 +261,34 @@ func TestEvent(t *testing.T) {
 			assert.NotContains(t, p.files, from, "shouldn't contain removed path")
 			assert.Contains(t, p.files, to, "should contain renamed path")
 		}
+	})
+
+	t.Run("RENAME watched path", func(t *testing.T) {
+		dirFrom := "temp"
+		dirTo := "renamed"
+		fileFrom := j(dirFrom, "file.png")
+		fileTo := j(dirTo, "file.png")
+		fsys := createFS([]string{fileFrom})
+		p := makePoller(fsys, ".")
+		failIfErr(t, p.Add("."))
+		failIfErr(t, p.Add(dirFrom))
+
+		evs := map[string]Event{}
+		evs[dirFrom] = Event{Op: Rename, Name: dirFrom, NewPath: dirTo}
+		ExpectEvents(t, p, minWait, evs)
+
+		go p.Start(0)
+
+		go func() {
+			time.Sleep(time.Millisecond * 2)
+			fsys[fileTo] = fsys[fileFrom]
+			delete(fsys, fileFrom)
+		}()
+
+		<-p.done
+		assert.NotContainsf(t, p.files, dirFrom, "shouldn't contain previous path")
+		assert.NotContainsf(t, p.files, fileFrom, "shouldn't contain previous path")
+		assert.NotContainsf(t, p.watches, dirFrom, "shouldn't watch removed path")
 	})
 
 	t.Run("WRITE", func(t *testing.T) {

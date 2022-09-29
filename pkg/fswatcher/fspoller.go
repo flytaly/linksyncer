@@ -125,7 +125,8 @@ func (p *fsPoller) scanForChanges() {
 	}
 }
 
-// onWatchedPathRemoved removes path from watched paths and of its files/subfolder
+// onWatchedPathRemoved removes path from watched paths and remove info of its files/subfolders.
+// Path itself should still be presented in the files map to trigger the corresponding event later.
 func (p *fsPoller) onWatchedPathRemoved(path string) {
 	delete(p.watches, path)
 	info := p.files[path]
