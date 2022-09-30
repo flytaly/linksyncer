@@ -34,24 +34,25 @@ func (p *fsPoller) AddShouldSkipHook(fn func(fs.FileInfo) bool) {
 	p.shouldSkip = fn
 }
 
-// Add adds given name into the list of the watched paths
-// and saves FileInfo of nested files
-func (p *fsPoller) Add(name string) error {
+// Add adds given name into the list of the watched paths.
+// If name is a directory, then retrieves FileInfo of nested files, saves them
+// and returns.
+func (p *fsPoller) Add(name string) (map[string]*fs.FileInfo, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if p.closed {
-		return errors.New("poller is closed")
+		return nil, errors.New("poller is closed")
 	}
 
 	relativePath, err := filepath.Rel(p.root, name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	list, err := p.listDirFiles(relativePath)
 	if err != nil /* && errors.Is(err, fs.ErrNotExist) */ {
-		return err
+		return nil, err
 	}
 
 	for fname, fi := range list {
@@ -60,7 +61,7 @@ func (p *fsPoller) Add(name string) error {
 
 	p.watches[relativePath] = struct{}{}
 
-	return nil
+	return list, nil
 }
 
 // listDirFiles returns list of the files if name is a directory,

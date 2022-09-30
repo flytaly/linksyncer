@@ -70,7 +70,8 @@ func TestAdd(t *testing.T) {
 		p := makePoller(fsys, ".")
 
 		for name := range watches {
-			failIfErr(t, p.Add(name))
+			_, err := p.Add(name)
+			failIfErr(t, err)
 		}
 
 		if !reflect.DeepEqual(p.watches, watches) {
@@ -83,7 +84,7 @@ func TestAdd(t *testing.T) {
 	t.Run("emit error if closed", func(t *testing.T) {
 		p := makePoller(fstest.MapFS{}, ".")
 		p.closed = true
-		err := p.Add("file")
+		_, err := p.Add("file")
 
 		want := errors.New("poller is closed")
 		if err == nil || err.Error() != want.Error() {
@@ -93,7 +94,7 @@ func TestAdd(t *testing.T) {
 
 	t.Run("file is not exist", func(t *testing.T) {
 		p := makePoller(fstest.MapFS{}, ".")
-		err := p.Add("some_folder")
+		_, err := p.Add("some_folder")
 		if !errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("Should throw error. %s", err)
 		}
@@ -104,9 +105,9 @@ func TestRemove(t *testing.T) {
 	t.Run("remove file", func(t *testing.T) {
 		fsys := createFS([]string{"path1", "path2"})
 		p := makePoller(fsys, ".")
-		failIfErr(t, p.Add("path1"))
-		failIfErr(t, p.Add("path2"))
-		failIfErr(t, p.Remove("path1"))
+		p.Add("path1")
+		p.Add("path2")
+		p.Remove("path1")
 		_, err := fsys.Stat("path2")
 		failIfErr(t, err)
 		assert.Contains(t, p.files, "path2")
@@ -137,7 +138,7 @@ func TestEvent(t *testing.T) {
 	t.Run("CREATE", func(t *testing.T) {
 		fsys := createFS([]string{"file"})
 		p := makePoller(fsys, ".")
-		failIfErr(t, p.Add("."))
+		p.Add(".")
 
 		newFiles := map[string]string{ // path => event's filename
 			"newFile1.txt":       "newFile1.txt",
@@ -170,7 +171,7 @@ func TestEvent(t *testing.T) {
 	t.Run("REMOVE", func(t *testing.T) {
 		fsys := createFS([]string{"file1.txt", "file2.txt", "file3.txt"})
 		p := makePoller(fsys, ".")
-		failIfErr(t, p.Add("."))
+		p.Add(".")
 
 		remove := []string{"file2.txt"}
 
@@ -204,11 +205,11 @@ func TestEvent(t *testing.T) {
 		})
 		pathToRemove := []string{"tempFile.txt", "temp"}
 		p := makePoller(fsys, ".")
-		failIfErr(t, p.Add("."))
+		p.Add(".")
 
 		evs := map[string]Event{}
 		for _, f := range pathToRemove {
-			failIfErr(t, p.Add(f))
+			p.Add(f)
 			evs[f] = Event{Op: Remove, Name: f}
 		}
 		ExpectEvents(t, p, minWait, evs)
@@ -235,7 +236,7 @@ func TestEvent(t *testing.T) {
 	t.Run("RENAME", func(t *testing.T) {
 		fsys := createFS([]string{"file1.txt", "file2.txt"})
 		p := makePoller(fsys, ".")
-		failIfErr(t, p.Add("."))
+		p.Add(".")
 
 		rename := map[string]string{"file2.txt": "renamed.txt"}
 
@@ -270,8 +271,8 @@ func TestEvent(t *testing.T) {
 		fileTo := j(dirTo, "file.png")
 		fsys := createFS([]string{fileFrom})
 		p := makePoller(fsys, ".")
-		failIfErr(t, p.Add("."))
-		failIfErr(t, p.Add(dirFrom))
+		p.Add(".")
+		p.Add(dirFrom)
 
 		evs := map[string]Event{}
 		evs[dirFrom] = Event{Op: Rename, Name: dirFrom, NewPath: dirTo}
@@ -294,7 +295,7 @@ func TestEvent(t *testing.T) {
 	t.Run("WRITE", func(t *testing.T) {
 		fsys := createFS([]string{"file1.txt", "file2.txt"})
 		p := makePoller(fsys, ".")
-		failIfErr(t, p.Add("."))
+		p.Add(".")
 
 		write := []string{"file2.txt"}
 
@@ -334,7 +335,7 @@ func TestShouldSkipHook(t *testing.T) {
 		p.AddShouldSkipHook(func(fi fs.FileInfo) bool {
 			return filepath.Ext(fi.Name()) != ".md"
 		})
-		failIfErr(t, p.Add("."))
+		p.Add(".")
 
 		for _, f := range skip {
 			assert.NotContains(t, p.files, f)
@@ -380,6 +381,7 @@ func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[strin
 }
 
 func failIfErr(t *testing.T, err error) {
+	t.Helper()
 	if err != nil {
 		t.Fatal(err)
 	}

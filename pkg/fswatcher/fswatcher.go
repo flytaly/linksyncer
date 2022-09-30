@@ -45,7 +45,7 @@ func (op Op) String() string {
 type FsWatcher interface {
 	Events() <-chan Event
 	Errors() <-chan error
-	Add(name string) error
+	Add(name string) (map[string]*fs.FileInfo, error)
 	Remove(name string) error
 	Close() error
 	Start(interval time.Duration) error
