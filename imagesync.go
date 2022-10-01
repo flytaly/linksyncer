@@ -52,8 +52,8 @@ func New(fileSystem fs.FS, root string) *ImageSync {
 }
 
 var extractImages = GetImagesFromFile
-var writeFile = func(filePath string, data []byte) error {
-	return os.WriteFile(filePath, data, 0644)
+var writeFile = func(absPath string, data []byte) error {
+	return os.WriteFile(absPath, data, 0644)
 }
 
 func (s *ImageSync) processDirs(dirs []string) {
@@ -90,11 +90,11 @@ func (s *ImageSync) AddFile(relativePath string) {
 		log.Println(err)
 		return
 	}
-	s.ParseFile(relativePath, string(data))
+	s.ParseFileContent(relativePath, string(data))
 }
 
 // Extract image paths from supported files and add them into `Images`
-func (s *ImageSync) ParseFile(relativePath, fileContent string) {
+func (s *ImageSync) ParseFileContent(relativePath, fileContent string) {
 	images := extractImages(relativePath, fileContent)
 
 	for _, img := range images {
@@ -126,25 +126,24 @@ func (s *ImageSync) RenameFile(prevPath, newPath string) {
 	s.AddFile(newPath)
 }
 
-func (s *ImageSync) UpdateImageLinks(filePath string, images []RenamedImage) error {
-	file, err := s.ReadFile(filePath)
-
+// UpdateLinksInFile replaces links in the file
+func (s *ImageSync) UpdateLinksInFile(relativePath string, links []RenamedImage) error {
+	content, err := s.ReadFile(relativePath)
 	if err != nil {
 		return err
 	}
 
-	updated := ReplaceImageLinks(filePath, file, images)
+	updated := ReplaceImageLinks(relativePath, content, links)
 
-	err = writeFile(filePath, updated)
-
+	err = writeFile(filepath.Join(s.root, relativePath), updated)
 	if err != nil {
 		return err
 	}
 
-	s.RemoveFile(filePath)
-	s.ParseFile(filePath, string(updated))
+	s.RemoveFile(relativePath)
+	s.ParseFileContent(relativePath, string(updated))
 
-	return err
+	return nil
 }
 
 func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {

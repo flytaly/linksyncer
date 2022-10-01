@@ -55,100 +55,69 @@ func TestRemoveFile(t *testing.T) {
 }
 
 func TestRenameFile(t *testing.T) {
-	from := "original_name.md"
-	to := "new_name.md"
-	note2 := "note2.md"
-	img1 := LinkInfo{rootPath: "assets/i1.png", originalLink: "./assets/i1.png"}
-	img2 := LinkInfo{rootPath: "assets/i2.png", originalLink: "./assets/i2.png"}
+	fs, filesWithLinks, linkedFiles := GetTestFileSys()
+	iSync := New(fs, ".")
+	iSync.Files = filesWithLinks
+	iSync.Images = linkedFiles
 
-	iSync := New(fstest.MapFS{"new_name.md": {Data: []byte("")}}, ".")
+	from := "notes/folder/note.md"
+	to := "notes/folder/renamed.md"
 
-	iSync.Files = map[string][]LinkInfo{from: {img1, img2}, note2: {img2}}
-	iSync.Images = map[string][]string{
-		"assets/i1.png": {from},
-		"assets/i2.png": {from, note2},
-	}
+	linkedFile1 := "notes/folder/assets/image01.png"
+	linkedFile2 := "notes/folder/assets/image02.png"
 
-	extractImagesOriginal := extractImages
-
-	extractImages = func(filePath, content string) []LinkInfo {
-		return []LinkInfo{img1, img2}
-	}
+	fs[to] = &fstest.MapFile{Data: fs[from].Data}
+	delete(fs, from)
 
 	iSync.RenameFile(from, to)
 
-	extractImages = extractImagesOriginal
+	assert.NotContains(t, iSync.Files, from)
+	assert.Contains(t, iSync.Files, to)
 
-	wantFiles := map[string][]LinkInfo{to: {img1, img2}, note2: {img2}}
-
-	assert.Equal(t, wantFiles, iSync.Files)
-
-	wantImages := map[string][]string{
-		"assets/i1.png": {to},
-		"assets/i2.png": {note2, to},
-	}
-
-	assert.Equal(t, wantImages, iSync.Images)
+	assert.NotContains(t, iSync.Images[linkedFile1], from)
+	assert.Contains(t, iSync.Images[linkedFile1], to)
+	assert.NotContains(t, iSync.Images[linkedFile2], from)
+	assert.Contains(t, iSync.Images[linkedFile2], to)
 }
 
 func TestUpdateImageLinks(t *testing.T) {
-	filePath := "my_note.md"
+	fs, filesWithLinks, linkedFiles := GetTestFileSys()
+	iSync := New(fs, ".")
+	iSync.Files = filesWithLinks
+	iSync.Images = linkedFiles
+
+	note := "notes/folder/note.md"
+	// note2 := "notes/folder/note2.md"
 
 	imgs := []RenamedImage{{
-		prevPath: "assets/image01.png",
-		newPath:  "images/image01.png",
+		prevPath: "notes/folder/assets/image01.png",
+		newPath:  "notes/folder/imgs/renamed.png",
 		link:     "./assets/image01.png",
 	}}
 
-	content := []byte("![alt text](" + imgs[0].link + ")")
+	writtenData := ""
+	writeFile = func(fPath string, data []byte) error {
+		assert.Equal(t, note, fPath)
+		writtenData = string(data)
+		return nil
+	}
 
-	mapFS := fstest.MapFS{filePath: {Data: content}}
+	err := iSync.UpdateLinksInFile(note, imgs)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	fileWriterOriginal := writeFile
-	t.Cleanup(func() {
-		writeFile = fileWriterOriginal
-	})
-
-	t.Run("update image links in the file", func(t *testing.T) {
-		iSync := New(mapFS, ".")
-		iSync.AddFile(filePath)
-		writtenData := ""
-
-		writeFile = func(fPath string, data []byte) error {
-			writtenData = string(data)
-			return nil
-		}
-
-		err := iSync.UpdateImageLinks(filePath, imgs)
-
-		if err != nil {
-			t.Error(err)
-		}
-
-		want := "![alt text](images/image01.png)"
+	t.Run("update image links in the files", func(t *testing.T) {
+		want := `![alt text](imgs/renamed.png)
+             ![alt text](./assets/image02.png)`
 		assert.Equal(t, want, writtenData)
 	})
 
 	t.Run("update images in the imagesync struct", func(t *testing.T) {
-		iSync := New(mapFS, ".")
-		iSync.AddFile(filePath)
-
-		writeFile = func(fPath string, data []byte) error {
-			return nil
-		}
-
-		err := iSync.UpdateImageLinks(filePath, imgs)
-		if err != nil {
-			t.Error(err)
-		}
-
-		updatedImageList := map[string][]string{}
-
 		for _, img := range imgs {
-			updatedImageList[img.newPath] = []string{filePath}
+			assert.NotContains(t, iSync.Images, img.prevPath)
+			assert.Contains(t, iSync.Images, img.newPath)
+			assert.Contains(t, iSync.Images[img.newPath], note)
 		}
-
-		assert.Equal(t, updatedImageList, iSync.Images)
-
 	})
 }
