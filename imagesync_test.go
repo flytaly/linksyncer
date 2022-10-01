@@ -1,197 +1,108 @@
 package imagesync
 
 import (
-	"path/filepath"
-	"reflect"
 	"testing"
 	"testing/fstest"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestProcessFiles(t *testing.T) {
-	root := "/home/user/notes"
-
-	j := filepath.Join
-
-	markdown := `
-				![alt text](./assets/image01.png)
-				![alt text](./assets/image02.png)
-	`
-	mapFS := fstest.MapFS{
-		"n/sub/note.md":  {Data: []byte(markdown)},
-		"n/sub/note2.md": {Data: []byte("![alt text](./assets/image02.png)")},
-	}
-
-	iSync := New(mapFS, root)
-
+	mapFS, wantFiles, wantRefs := GetTestFileSys()
+	iSync := New(mapFS, ".")
 	iSync.ProcessFiles()
-
-	wantDirs := map[string]bool{
-		root:             true,
-		j(root, "n"):     true,
-		j(root, "n/sub"): true,
-	}
-
-	if !reflect.DeepEqual(iSync.Dirs, wantDirs) {
-		t.Errorf("got %v, want %v", iSync.Dirs, wantDirs)
-	}
-
-	wantFiles := map[string][]ImageInfo{
-		j(root, "n/sub/note.md"): {
-			ImageInfo{
-				absPath:      j(root, "n/sub/", "./assets/image01.png"),
-				originalLink: "./assets/image01.png",
-			},
-			ImageInfo{
-				absPath:      j(root, "n/sub/", "./assets/image02.png"),
-				originalLink: "./assets/image02.png",
-			},
-		},
-		j(root, "n/sub/note2.md"): {
-			ImageInfo{
-				absPath:      j(root, "n/sub/", "./assets/image02.png"),
-				originalLink: "./assets/image02.png",
-			},
-		},
-	}
-	if !reflect.DeepEqual(iSync.Files, wantFiles) {
-		t.Errorf("got %v,\n want %v", iSync.Files, wantFiles)
-	}
-
-	wantImages := map[string][]string{
-		j(root, "n/sub/assets/image01.png"): {j(root, "n/sub/note.md")},
-		j(root, "n/sub/assets/image02.png"): {j(root, "n/sub/note.md"), j(root, "n/sub/note2.md")},
-	}
-
-	if !reflect.DeepEqual(iSync.Images, wantImages) {
-		t.Errorf("got %v, want %v", iSync.Images, wantImages)
-	}
+	assert.Equal(t, wantFiles, iSync.Files)
+	assert.Equal(t, wantRefs, iSync.Images)
 }
 
 func TestRemoveFile(t *testing.T) {
-	root := "/home/user/notes"
-	j := filepath.Join
-
-	note1 := j(root, "/note1.md")
-	note2 := j(root, "/note2.md")
-	img1 := ImageInfo{absPath: j(root, "./assets/i1.png"), originalLink: "./assets/i1.png"}
-	img2 := ImageInfo{absPath: j(root, "./assets/i2.png"), originalLink: "./assets/i2.png"}
-	files := map[string][]ImageInfo{note1: {img1, img2}, note2: {img2}}
-	images := map[string][]string{
-		j(root, "assets/i1.png"): {note1},
-		j(root, "assets/i2.png"): {note1, note2},
-	}
-
+	note1 := "notes/folder/note.md"
+	note2 := "notes/folder/note2.md"
 	t.Run("remove note 1", func(t *testing.T) {
-		iSync := New(fstest.MapFS{}, root)
+		fs, filesWithLinks, linkedFiles := GetTestFileSys()
+		iSync := New(fs, ".")
+		iSync.Files = filesWithLinks
+		iSync.Images = linkedFiles
 
-		for k, v := range files {
-			iSync.Files[k] = v
-		}
-		for k, v := range images {
-			iSync.Images[k] = v
-		}
-
+		assert.Contains(t, iSync.Files, note1)
 		iSync.RemoveFile(note1)
+		assert.NotContains(t, iSync.Files, note1)
 
-		wantFiles := map[string][]ImageInfo{note2: {img2}}
-		if !reflect.DeepEqual(iSync.Files, wantFiles) {
-			t.Errorf("got %v, want %v", iSync.Files, wantFiles)
+		refsAfter := map[string][]string{
+			// "notes/folder/assets/image01.png": {note1},
+			"notes/folder/assets/image02.png": { /* note1, */ note2},
 		}
-
-		wantImages := map[string][]string{
-			// j(root, "assets/i1.png"): nil,
-			j(root, "assets/i2.png"): {note2},
-		}
-		if !reflect.DeepEqual(iSync.Images, wantImages) {
-			t.Errorf("got %v, want %v", iSync.Images, wantImages)
-		}
+		assert.Equal(t, refsAfter, iSync.Images)
 	})
 
 	t.Run("remove note 2", func(t *testing.T) {
-		iSync := New(fstest.MapFS{}, root)
-		for k, v := range files {
-			iSync.Files[k] = v
-		}
-		for k, v := range images {
-			iSync.Images[k] = v
-		}
+		fs, filesWithLinks, linkedFiles := GetTestFileSys()
+		iSync := New(fs, ".")
+		iSync.Files = filesWithLinks
+		iSync.Images = linkedFiles
 
+		assert.Contains(t, iSync.Files, note2)
 		iSync.RemoveFile(note2)
+		assert.NotContains(t, iSync.Files, note2)
 
-		wantFiles := map[string][]ImageInfo{note1: {img1, img2}}
-		if !reflect.DeepEqual(iSync.Files, wantFiles) {
-			t.Errorf("got %v, want %v", iSync.Files, wantFiles)
+		refsAfter := map[string][]string{
+			"notes/folder/assets/image01.png": {note1},
+			"notes/folder/assets/image02.png": {note1 /* , note2 */},
 		}
-
-		wantImages := map[string][]string{
-			j(root, "assets/i1.png"): {note1},
-			j(root, "assets/i2.png"): {note1},
-		}
-		if !reflect.DeepEqual(iSync.Images, wantImages) {
-			t.Errorf("got %v, want %v", iSync.Images, wantImages)
-		}
+		assert.Equal(t, refsAfter, iSync.Images)
 	})
 
 }
 
 func TestRenameFile(t *testing.T) {
-	root := "/home/user/notes"
-	j := filepath.Join
+	from := "original_name.md"
+	to := "new_name.md"
+	note2 := "note2.md"
+	img1 := LinkInfo{rootPath: "assets/i1.png", originalLink: "./assets/i1.png"}
+	img2 := LinkInfo{rootPath: "assets/i2.png", originalLink: "./assets/i2.png"}
 
-	prevName := j(root, "/original_name.md")
-	newName := j(root, "/new_name.md")
-	note2 := j(root, "/note2.md")
-	img1 := ImageInfo{absPath: j(root, "./assets/i1.png"), originalLink: "./assets/i1.png"}
-	img2 := ImageInfo{absPath: j(root, "./assets/i2.png"), originalLink: "./assets/i2.png"}
+	iSync := New(fstest.MapFS{"new_name.md": {Data: []byte("")}}, ".")
 
-	iSync := New(fstest.MapFS{
-		"new_name.md": {Data: []byte("")},
-	}, root)
-
-	iSync.Files = map[string][]ImageInfo{prevName: {img1, img2}, note2: {img2}}
+	iSync.Files = map[string][]LinkInfo{from: {img1, img2}, note2: {img2}}
 	iSync.Images = map[string][]string{
-		j(root, "assets/i1.png"): {prevName},
-		j(root, "assets/i2.png"): {prevName, note2},
+		"assets/i1.png": {from},
+		"assets/i2.png": {from, note2},
 	}
 
 	extractImagesOriginal := extractImages
 
-	extractImages = func(filePath, content string) []ImageInfo {
-		return []ImageInfo{img1, img2}
+	extractImages = func(filePath, content string) []LinkInfo {
+		return []LinkInfo{img1, img2}
 	}
 
-	iSync.RenameFile(prevName, newName)
+	iSync.RenameFile(from, to)
 
 	extractImages = extractImagesOriginal
 
-	wantFiles := map[string][]ImageInfo{newName: {img1, img2}, note2: {img2}}
-	if !reflect.DeepEqual(iSync.Files, wantFiles) {
-		t.Errorf("got %v, want %v", iSync.Files, wantFiles)
-	}
+	wantFiles := map[string][]LinkInfo{to: {img1, img2}, note2: {img2}}
+
+	assert.Equal(t, wantFiles, iSync.Files)
 
 	wantImages := map[string][]string{
-		j(root, "assets/i1.png"): {newName},
-		j(root, "assets/i2.png"): {note2, newName},
+		"assets/i1.png": {to},
+		"assets/i2.png": {note2, to},
 	}
-	if !reflect.DeepEqual(iSync.Images, wantImages) {
-		t.Errorf("got %v, want %v", iSync.Images, wantImages)
-	}
+
+	assert.Equal(t, wantImages, iSync.Images)
 }
 
 func TestUpdateImageLinks(t *testing.T) {
-	root := "/home/user/notes"
-	j := filepath.Join
-	filePath := j(root, "my_note.md")
+	filePath := "my_note.md"
 
 	imgs := []RenamedImage{{
-		prevPath: j(root, "./assets/image01.png"),
-		newPath:  j(root, "./images/image01.png"),
+		prevPath: "assets/image01.png",
+		newPath:  "images/image01.png",
 		link:     "./assets/image01.png",
 	}}
 
 	content := []byte("![alt text](" + imgs[0].link + ")")
 
-	mapFS := fstest.MapFS{"my_note.md": {Data: content}}
+	mapFS := fstest.MapFS{filePath: {Data: content}}
 
 	fileWriterOriginal := writeFile
 	t.Cleanup(func() {
@@ -199,7 +110,7 @@ func TestUpdateImageLinks(t *testing.T) {
 	})
 
 	t.Run("update image links in the file", func(t *testing.T) {
-		iSync := New(mapFS, root)
+		iSync := New(mapFS, ".")
 		iSync.AddFile(filePath)
 		writtenData := ""
 
@@ -215,14 +126,11 @@ func TestUpdateImageLinks(t *testing.T) {
 		}
 
 		want := "![alt text](images/image01.png)"
-
-		if writtenData != want {
-			t.Errorf("expect %s, got %s", want, writtenData)
-		}
+		assert.Equal(t, want, writtenData)
 	})
 
 	t.Run("update images in the imagesync struct", func(t *testing.T) {
-		iSync := New(mapFS, root)
+		iSync := New(mapFS, ".")
 		iSync.AddFile(filePath)
 
 		writeFile = func(fPath string, data []byte) error {
@@ -236,12 +144,11 @@ func TestUpdateImageLinks(t *testing.T) {
 
 		updatedImageList := map[string][]string{}
 
-		for _, imgs := range imgs {
-			updatedImageList[imgs.newPath] = []string{filePath}
+		for _, img := range imgs {
+			updatedImageList[img.newPath] = []string{filePath}
 		}
 
-		if !reflect.DeepEqual(updatedImageList, iSync.Images) {
-			t.Errorf("want %v, got %v", updatedImageList, iSync.Images)
-		}
+		assert.Equal(t, updatedImageList, iSync.Images)
+
 	})
 }

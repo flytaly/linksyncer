@@ -34,18 +34,18 @@ func htmlImages() map[string]string {
 
 const lorem = "Lorem ipsum dolor sit amet"
 
-func makeMarkdown(basepath string) (string, []ImageInfo) {
+func makeMarkdown(basepath string) (string, []LinkInfo) {
 	var markdown = ` # Test file\n## Paragraph\n
 		![link to an image](https://somesite.com/picture.png)`
 
-	images := []ImageInfo{}
+	images := []LinkInfo{}
 
 	for k, path := range mdImages() {
 		absPath := path
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(basepath, path)
 		}
-		images = append(images, ImageInfo{absPath: absPath, originalLink: path})
+		images = append(images, LinkInfo{rootPath: absPath, originalLink: path})
 		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, k)
 	}
 
@@ -54,23 +54,23 @@ func makeMarkdown(basepath string) (string, []ImageInfo) {
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(basepath, path)
 		}
-		images = append(images, ImageInfo{absPath: absPath, originalLink: path})
+		images = append(images, LinkInfo{rootPath: absPath, originalLink: path})
 		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, k)
 	}
 
 	return markdown, images
 }
 
-func makeHTML(basepath string) (string, []ImageInfo) {
+func makeHTML(basepath string) (string, []LinkInfo) {
 	var html = ""
-	images := []ImageInfo{}
+	images := []LinkInfo{}
 
 	for k, path := range htmlImages() {
 		absPath := path
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(basepath, path)
 		}
-		images = append(images, ImageInfo{absPath: absPath, originalLink: path})
+		images = append(images, LinkInfo{rootPath: absPath, originalLink: path})
 		html += fmt.Sprintf("\n%s\n%s", lorem, k)
 	}
 

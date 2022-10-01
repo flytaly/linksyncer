@@ -1,90 +1,121 @@
 package imagesync
 
 import (
+	"fmt"
+	"imagesync/pkg/fswatcher"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
 )
 
 type ImageSync struct {
 	fileSystem fs.FS
-	root       string                 // path to the root directory
-	Dirs       map[string]bool        // watching directories
-	Files      map[string][]ImageInfo // watching files
-	Images     map[string][]string    // map images' paths to their text files
+	root       string                // path to the root directory
+	Files      map[string][]LinkInfo // watching files
+	Images     map[string][]string   // map images' paths to their text files
+
+	watcher fswatcher.FsWatcher
+
+	mu *sync.Mutex
+}
+
+var parsableFiles = regexp.MustCompile("(?i)(" + ParsableFilesExtension + ")$")
+
+var watchedExt = regexp.MustCompile("(?i)(" + ImgExtensions + "|" + ParsableFilesExtension + ")$")
+
+func shouldSkipPath(fi fs.FileInfo) bool {
+	name := fi.Name()
+	if fi.IsDir() {
+		// TODO: should be optional
+		return strings.HasPrefix(name, ".") || ExcludedDirs[name]
+	}
+
+	return !watchedExt.MatchString(name)
 }
 
 // Creates a new ImageSync
 func New(fileSystem fs.FS, root string) *ImageSync {
+	watcher := fswatcher.NewFsPoller(fileSystem, root)
+	watcher.AddShouldSkipHook(shouldSkipPath)
 	return &ImageSync{
 		root:       root,
-		Dirs:       map[string]bool{},
-		Files:      map[string][]ImageInfo{},
+		watcher:    watcher,
+		Files:      map[string][]LinkInfo{},
 		Images:     map[string][]string{},
 		fileSystem: fileSystem,
+		mu:         new(sync.Mutex),
 	}
 }
 
-var watchList = WatchList
 var extractImages = GetImagesFromFile
 var writeFile = func(filePath string, data []byte) error {
 	return os.WriteFile(filePath, data, 0644)
 }
 
+func (s *ImageSync) processDirs(dirs []string) {
+	nestedDirs := []string{}
+	for _, current := range dirs {
+		paths, err := s.watcher.Add(current)
+		if err != nil {
+			fmt.Printf("Couldn't add folder %s to watcher: %v", current, err)
+			continue
+		}
+		for f, fi := range paths {
+			if !(*fi).IsDir() && parsableFiles.MatchString(f) {
+				s.AddFile(f)
+				continue
+			}
+			if f != "." && f != current {
+				nestedDirs = append(nestedDirs, f)
+			}
+		}
+	}
+	if len(nestedDirs) > 0 {
+		s.processDirs(nestedDirs)
+	}
+}
+
 // Walks the file tree and fill Images and Files maps
 func (s *ImageSync) ProcessFiles() {
-	dirs, files, err := watchList(s.fileSystem, s.root)
+	s.processDirs([]string{s.root})
+}
+func (s *ImageSync) AddFile(relativePath string) {
+	s.Files[relativePath] = []LinkInfo{}
+	data, err := s.ReadFile(relativePath)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-
-	for _, path := range dirs {
-		s.AddDir(path)
-	}
-	for _, path := range files {
-		s.AddFile(path)
-	}
-}
-
-func (s *ImageSync) AddDir(dirPath string) {
-	s.Dirs[dirPath] = true
-}
-
-func (s *ImageSync) AddFile(filePath string) {
-	s.Files[filePath] = []ImageInfo{}
-	data, err := s.ReadFile(filePath)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	s.ParseFile(filePath, string(data))
+	s.ParseFile(relativePath, string(data))
 }
 
 // Extract image paths from supported files and add them into `Images`
-func (s *ImageSync) ParseFile(filePath, fileContent string) {
-	images := extractImages(filePath, fileContent)
+func (s *ImageSync) ParseFile(relativePath, fileContent string) {
+	images := extractImages(relativePath, fileContent)
 
 	for _, img := range images {
-		s.Images[img.absPath] = append(s.Images[img.absPath], filePath)
-		s.Files[filePath] = append(s.Files[filePath], img)
+		s.Images[img.rootPath] = append(s.Images[img.rootPath], relativePath)
+		s.Files[relativePath] = append(s.Files[relativePath], img)
 	}
 }
 
 // Remove a file and its images from the ImageSync struct
-func (s *ImageSync) RemoveFile(filePath string) {
-	if images, ok := s.Files[filePath]; ok {
+func (s *ImageSync) RemoveFile(relativePath string) {
+	if images, ok := s.Files[relativePath]; ok {
 		for _, image := range images {
-			if files, ok := s.Images[image.absPath]; ok {
-				s.Images[image.absPath] = filter(files, func(s string) bool { return s != filePath })
+			if files, ok := s.Images[image.rootPath]; ok {
+				s.Images[image.rootPath] = filter(files, func(s string) bool { return s != relativePath })
 			}
-			if len(s.Images[image.absPath]) == 0 {
-				delete(s.Images, image.absPath)
+			if len(s.Images[image.rootPath]) == 0 {
+				delete(s.Images, image.rootPath)
 			}
 
 		}
-		delete(s.Files, filePath)
+		delete(s.Files, relativePath)
 	}
 }
 
@@ -117,13 +148,17 @@ func (s *ImageSync) UpdateImageLinks(filePath string, images []RenamedImage) err
 }
 
 func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
-	relativePath, err := filepath.Rel(s.root, filePath)
+	var err error
+	var relativePath = filePath
+	if filepath.IsAbs(relativePath) {
+		relativePath, err = filepath.Rel(s.root, filePath)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	data, err := fs.ReadFile(s.fileSystem, relativePath)
+	data, err := fs.ReadFile(s.fileSystem, filePath)
 
 	if err != nil {
 		return nil, err

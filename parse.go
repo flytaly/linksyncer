@@ -17,8 +17,8 @@ var mdRegexp = regexp.MustCompile(mdImage + "|" + mdImageRef + "|" + htmlImage)
 var htmlRegexp = regexp.MustCompile(htmlImage)
 var imageExtensions = regexp.MustCompile("(?i)(?:" + ImgExtensions + ")$")
 
-type ImageInfo struct {
-	absPath      string
+type LinkInfo struct {
+	rootPath     string
 	originalLink string
 }
 
@@ -66,9 +66,9 @@ func filterImages(paths []string) []string {
 }
 
 // Extracts images from a file's content. filePath argument should be absolute.
-func GetImagesFromFile(filePath string, content string) []ImageInfo {
+func GetImagesFromFile(filePath string, content string) []LinkInfo {
 	var imgPaths []string
-	result := []ImageInfo{}
+	result := []LinkInfo{}
 
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md":
@@ -84,10 +84,10 @@ func GetImagesFromFile(filePath string, content string) []ImageInfo {
 	for _, p := range imgPaths {
 		if !filepath.IsAbs(p) {
 			dir := filepath.Dir(filePath)
-			info := ImageInfo{originalLink: p, absPath: filepath.Join(dir, p)}
+			info := LinkInfo{originalLink: p, rootPath: filepath.Join(dir, p)}
 			result = append(result, info)
 		} else {
-			result = append(result, ImageInfo{originalLink: p, absPath: p})
+			result = append(result, LinkInfo{originalLink: p, rootPath: p})
 		}
 	}
 

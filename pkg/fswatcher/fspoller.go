@@ -45,9 +45,14 @@ func (p *fsPoller) Add(name string) (map[string]*fs.FileInfo, error) {
 		return nil, errors.New("poller is closed")
 	}
 
-	relativePath, err := filepath.Rel(p.root, name)
-	if err != nil {
-		return nil, err
+	var err error
+	relativePath := name
+
+	if filepath.IsAbs(relativePath) {
+		relativePath, err = filepath.Rel(p.root, name)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	list, err := p.listDirFiles(relativePath)
