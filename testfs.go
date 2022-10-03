@@ -51,10 +51,10 @@ var testFiles = map[string]testFile{
 	},
 }
 
-func GetTestFileSys() (fs fstest.MapFS, links map[string][]LinkInfo, wasLinked map[string][]string) {
+func GetTestFileSys() (fs fstest.MapFS, links map[string][]LinkInfo, wasLinked map[string]map[string]struct{}) {
 	fs = make(map[string]*fstest.MapFile)
 	links = make(map[string][]LinkInfo)
-	wasLinked = make(map[string][]string)
+	wasLinked = make(map[string]map[string]struct{})
 
 	for path, testFile := range testFiles {
 		fs[path] = testFile.mapFile
@@ -62,7 +62,10 @@ func GetTestFileSys() (fs fstest.MapFS, links map[string][]LinkInfo, wasLinked m
 			links[path] = testFile.hasLinks
 		}
 		if len(testFile.wasLinked) > 0 {
-			wasLinked[path] = testFile.wasLinked
+			wasLinked[path] = map[string]struct{}{}
+			for _, v := range testFile.wasLinked {
+				wasLinked[path][v] = struct{}{}
+			}
 		}
 	}
 

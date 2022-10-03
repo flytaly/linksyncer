@@ -24,7 +24,7 @@ func main() {
 
 	watcher := fswatcher.NewFsPoller(os.DirFS(root), root)
 
-	err = watcher.Add(filepath.Join(root, "/test_files"))
+	_, err = watcher.Add(filepath.Join(root, "/test_files"))
 
 	if err != nil {
 		log.Fatal(err)

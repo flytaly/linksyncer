@@ -22,7 +22,7 @@ type LinkInfo struct {
 	originalLink string
 }
 
-type RenamedImage struct {
+type MovedLink struct {
 	prevPath string
 	newPath  string
 	link     string
@@ -94,13 +94,13 @@ func GetImagesFromFile(filePath string, content string) []LinkInfo {
 	return result
 }
 
-func ReplaceImageLinks(filePath string, fileContent []byte, imgs []RenamedImage) []byte {
+func ReplaceImageLinks(fPath string, fileContent []byte, imgs []MovedLink) []byte {
 	result := fileContent
 
 	for _, img := range imgs {
 		targpath := ""
 		if !filepath.IsAbs(img.link) {
-			targpath, _ = filepath.Rel(filepath.Dir(filePath), img.newPath)
+			targpath, _ = filepath.Rel(filepath.Dir(fPath), img.newPath)
 		}
 		if targpath == "" {
 			targpath = img.newPath

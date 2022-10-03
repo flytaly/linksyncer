@@ -107,28 +107,28 @@ func TestReplaceImageLinks(t *testing.T) {
 	j := filepath.Join
 
 	images := []struct {
-		RenamedImage
+		MovedLink
 		linkFrom string
 		linkTo   string
 	}{
 		{
-			RenamedImage{j(dir, "image1.png"), j(dir, "image2.png"), "image1.png"},
+			MovedLink{j(dir, "image1.png"), j(dir, "image2.png"), "image1.png"},
 			"![](image1.png)",
 			"![](image2.png)",
 		},
 		{
-			RenamedImage{j(dir, "./assets/image2.gif"), j(dir, "./assets/subfolder/i.png"), "./assets/images2.gif"},
+			MovedLink{j(dir, "./assets/image2.gif"), j(dir, "./assets/subfolder/i.png"), "./assets/images2.gif"},
 			`![alt text](./assets/images2.gif "title")`,
 			`![alt text](assets/subfolder/i.png "title")`,
 		},
 		{
 			// Absolute path
-			RenamedImage{j(dir, "image3.png"), j(dir, "image4.png"), j(dir, "image3.png")},
+			MovedLink{j(dir, "image3.png"), j(dir, "image4.png"), j(dir, "image3.png")},
 			fmt.Sprintf(`![alt text](%s "title")`, j(dir, "image3.png")),
 			fmt.Sprintf(`![alt text](%s "title")`, j(dir, "image4.png")),
 		},
 		{
-			RenamedImage{j(dir, "../../pics/pic1.png"), j(dir, "../folder/pic1.png"), "../pics/pic1.png"},
+			MovedLink{j(dir, "../../pics/pic1.png"), j(dir, "../folder/pic1.png"), "../pics/pic1.png"},
 			`<img src = "../pics/pic1.png" alt="alt text" />`,
 			`<img src = "../folder/pic1.png" alt="alt text" />`,
 		},
@@ -139,7 +139,7 @@ func TestReplaceImageLinks(t *testing.T) {
 			md := fmt.Sprintf("# Test markdown %d\n## Text with images\n%s\ntext after the image...", i, v.linkFrom)
 			want := fmt.Sprintf("# Test markdown %d\n## Text with images\n%s\ntext after the image...", i, v.linkTo)
 
-			got := string(ReplaceImageLinks(filePath, []byte(md), []RenamedImage{v.RenamedImage}))
+			got := string(ReplaceImageLinks(filePath, []byte(md), []MovedLink{v.MovedLink}))
 			assertText(t, got, want)
 		})
 	}

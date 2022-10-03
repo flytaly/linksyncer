@@ -14,9 +14,9 @@ import (
 
 type ImageSync struct {
 	fileSystem fs.FS
-	root       string                // path to the root directory
-	Files      map[string][]LinkInfo // watching files
-	Images     map[string][]string   // map images' paths to their text files
+	root       string                         // path to the root directory
+	Files      map[string][]LinkInfo          // watching files
+	Images     map[string]map[string]struct{} // map images' paths to their text files
 
 	watcher fswatcher.FsWatcher
 
@@ -45,7 +45,7 @@ func New(fileSystem fs.FS, root string) *ImageSync {
 		root:       root,
 		watcher:    watcher,
 		Files:      map[string][]LinkInfo{},
-		Images:     map[string][]string{},
+		Images:     map[string]map[string]struct{}{},
 		fileSystem: fileSystem,
 		mu:         new(sync.Mutex),
 	}
@@ -65,7 +65,7 @@ func (s *ImageSync) processDirs(dirs []string) {
 			continue
 		}
 		for f, fi := range paths {
-			if !(*fi).IsDir() && parsableFiles.MatchString(f) {
+			if !(*fi).IsDir() && s.isParsable(f) {
 				s.AddFile(f)
 				continue
 			}
@@ -79,10 +79,15 @@ func (s *ImageSync) processDirs(dirs []string) {
 	}
 }
 
+func (s *ImageSync) isParsable(f string) bool {
+	return parsableFiles.MatchString(f)
+}
+
 // Walks the file tree and fill Images and Files maps
 func (s *ImageSync) ProcessFiles() {
 	s.processDirs([]string{s.root})
 }
+
 func (s *ImageSync) AddFile(relativePath string) {
 	s.Files[relativePath] = []LinkInfo{}
 	data, err := s.ReadFile(relativePath)
@@ -90,44 +95,64 @@ func (s *ImageSync) AddFile(relativePath string) {
 		log.Println(err)
 		return
 	}
-	s.ParseFileContent(relativePath, string(data))
+
+	images := extractImages(relativePath, string(data))
+	s.saveLinks(relativePath, &images)
 }
 
-// Extract image paths from supported files and add them into `Images`
-func (s *ImageSync) ParseFileContent(relativePath, fileContent string) {
-	images := extractImages(relativePath, fileContent)
+func (s *ImageSync) clearLinkReferences(sourceFilePath string, linkPath string) {
+	delete(s.Images[linkPath], sourceFilePath)
+	if len(s.Images[linkPath]) == 0 {
+		delete(s.Images, linkPath)
+	}
+}
 
-	for _, img := range images {
-		s.Images[img.rootPath] = append(s.Images[img.rootPath], relativePath)
-		s.Files[relativePath] = append(s.Files[relativePath], img)
+func (s *ImageSync) saveLinks(sourceFilePath string, links *[]LinkInfo) {
+	for _, img := range *links {
+		if s.Images[img.rootPath] == nil {
+			s.Images[img.rootPath] = map[string]struct{}{}
+		}
+		s.Images[img.rootPath][sourceFilePath] = struct{}{}
+		s.Files[sourceFilePath] = append(s.Files[sourceFilePath], img)
 	}
 }
 
 // Remove a file and its images from the ImageSync struct
 func (s *ImageSync) RemoveFile(relativePath string) {
 	if images, ok := s.Files[relativePath]; ok {
-		for _, image := range images {
-			if files, ok := s.Images[image.rootPath]; ok {
-				s.Images[image.rootPath] = filter(files, func(s string) bool { return s != relativePath })
-			}
-			if len(s.Images[image.rootPath]) == 0 {
-				delete(s.Images, image.rootPath)
-			}
-
+		for _, li := range images {
+			s.clearLinkReferences(relativePath, li.rootPath)
 		}
 		delete(s.Files, relativePath)
 	}
 }
 
 func (s *ImageSync) RenameFile(prevPath, newPath string) {
-	// TODO: Image links in the file should be updated after file relocation
-
-	s.RemoveFile(prevPath)
-	s.AddFile(newPath)
+	if links, ok := s.Files[prevPath]; ok {
+		s.Files[newPath] = s.Files[prevPath]
+		delete(s.Files, prevPath)
+		if len(s.Files[newPath]) == 0 {
+			return
+		}
+		// update links
+		movedLinks := []MovedLink{}
+		for _, li := range links {
+			movedLinks = append(movedLinks, MovedLink{
+				prevPath: li.rootPath,
+				newPath:  li.rootPath,
+				link:     li.originalLink,
+			})
+			s.clearLinkReferences(prevPath, li.rootPath)
+		}
+		err := s.UpdateLinksInFile(newPath, movedLinks)
+		if err != nil {
+			fmt.Println("Couldn't update links in", newPath, err)
+		}
+	}
 }
 
 // UpdateLinksInFile replaces links in the file
-func (s *ImageSync) UpdateLinksInFile(relativePath string, links []RenamedImage) error {
+func (s *ImageSync) UpdateLinksInFile(relativePath string, links []MovedLink) error {
 	content, err := s.ReadFile(relativePath)
 	if err != nil {
 		return err
@@ -140,8 +165,11 @@ func (s *ImageSync) UpdateLinksInFile(relativePath string, links []RenamedImage)
 		return err
 	}
 
-	s.RemoveFile(relativePath)
-	s.ParseFileContent(relativePath, string(updated))
+	images := extractImages(relativePath, string(updated))
+	for _, link := range links {
+		s.clearLinkReferences(relativePath, link.prevPath)
+	}
+	s.saveLinks(relativePath, &images)
 
 	return nil
 }

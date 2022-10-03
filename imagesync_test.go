@@ -7,6 +7,25 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func mockWriteFile(t *testing.T, expectPath string) (*string, func()) {
+	t.Helper()
+	original := writeFile
+
+	writtenData := new(string)
+	writeFile = func(fPath string, data []byte) error {
+		if expectPath != "" {
+			assert.Equal(t, expectPath, fPath, "should write into")
+		}
+		*writtenData = string(data)
+		return nil
+	}
+	restore := func() {
+		writeFile = original
+	}
+	t.Cleanup(func() { restore() })
+	return writtenData, restore
+}
+
 func TestProcessFiles(t *testing.T) {
 	mapFS, wantFiles, wantRefs := GetTestFileSys()
 	iSync := New(mapFS, ".")
@@ -28,9 +47,9 @@ func TestRemoveFile(t *testing.T) {
 		iSync.RemoveFile(note1)
 		assert.NotContains(t, iSync.Files, note1)
 
-		refsAfter := map[string][]string{
+		refsAfter := map[string]map[string]struct{}{
 			// "notes/folder/assets/image01.png": {note1},
-			"notes/folder/assets/image02.png": { /* note1, */ note2},
+			"notes/folder/assets/image02.png": { /* note1, */ note2: struct{}{}},
 		}
 		assert.Equal(t, refsAfter, iSync.Images)
 	})
@@ -45,9 +64,9 @@ func TestRemoveFile(t *testing.T) {
 		iSync.RemoveFile(note2)
 		assert.NotContains(t, iSync.Files, note2)
 
-		refsAfter := map[string][]string{
-			"notes/folder/assets/image01.png": {note1},
-			"notes/folder/assets/image02.png": {note1 /* , note2 */},
+		refsAfter := map[string]map[string]struct{}{
+			"notes/folder/assets/image01.png": {note1: struct{}{}},
+			"notes/folder/assets/image02.png": {note1: struct{}{} /* , note2 */},
 		}
 		assert.Equal(t, refsAfter, iSync.Images)
 	})
@@ -61,7 +80,7 @@ func TestRenameFile(t *testing.T) {
 	iSync.Images = linkedFiles
 
 	from := "notes/folder/note.md"
-	to := "notes/folder/renamed.md"
+	to := "notes/renamed.md"
 
 	linkedFile1 := "notes/folder/assets/image01.png"
 	linkedFile2 := "notes/folder/assets/image02.png"
@@ -69,15 +88,22 @@ func TestRenameFile(t *testing.T) {
 	fs[to] = &fstest.MapFile{Data: fs[from].Data}
 	delete(fs, from)
 
+	expectedData := `![alt text](folder/assets/image01.png)
+             ![alt text](folder/assets/image02.png)`
+	gotData, restore := mockWriteFile(t, to)
+	t.Cleanup(func() { restore() })
+
 	iSync.RenameFile(from, to)
 
-	assert.NotContains(t, iSync.Files, from)
-	assert.Contains(t, iSync.Files, to)
+	assert.NotContains(t, iSync.Files, from, "should delete old path")
+	assert.Contains(t, iSync.Files, to, "should add new path")
 
-	assert.NotContains(t, iSync.Images[linkedFile1], from)
-	assert.Contains(t, iSync.Images[linkedFile1], to)
-	assert.NotContains(t, iSync.Images[linkedFile2], from)
-	assert.Contains(t, iSync.Images[linkedFile2], to)
+	assert.NotContains(t, iSync.Images[linkedFile1], from, "should delete old reference")
+	assert.Contains(t, iSync.Images[linkedFile1], to, "should add new reference")
+	assert.NotContains(t, iSync.Images[linkedFile2], from, "should delete old reference")
+	assert.Contains(t, iSync.Images[linkedFile2], to, "should add new reference")
+
+	assert.Equal(t, expectedData, *gotData)
 }
 
 func TestUpdateImageLinks(t *testing.T) {
@@ -89,18 +115,14 @@ func TestUpdateImageLinks(t *testing.T) {
 	note := "notes/folder/note.md"
 	// note2 := "notes/folder/note2.md"
 
-	imgs := []RenamedImage{{
+	imgs := []MovedLink{{
 		prevPath: "notes/folder/assets/image01.png",
-		newPath:  "notes/folder/imgs/renamed.png",
+		newPath:  "notes/imgs/renamed.png",
 		link:     "./assets/image01.png",
 	}}
 
-	writtenData := ""
-	writeFile = func(fPath string, data []byte) error {
-		assert.Equal(t, note, fPath)
-		writtenData = string(data)
-		return nil
-	}
+	written, restore := mockWriteFile(t, note)
+	t.Cleanup(func() { restore() })
 
 	err := iSync.UpdateLinksInFile(note, imgs)
 	if err != nil {
@@ -108,9 +130,9 @@ func TestUpdateImageLinks(t *testing.T) {
 	}
 
 	t.Run("update image links in the files", func(t *testing.T) {
-		want := `![alt text](imgs/renamed.png)
+		want := `![alt text](../imgs/renamed.png)
              ![alt text](./assets/image02.png)`
-		assert.Equal(t, want, writtenData)
+		assert.Equal(t, want, *written)
 	})
 
 	t.Run("update images in the imagesync struct", func(t *testing.T) {
