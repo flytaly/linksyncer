@@ -83,11 +83,12 @@ func (s *ImageSync) isParsable(f string) bool {
 	return parsableFiles.MatchString(f)
 }
 
-// Walks the file tree and fill Images and Files maps
+// ProcessFiles walks the file tree and adds valid files
 func (s *ImageSync) ProcessFiles() {
 	s.processDirs([]string{s.root})
 }
 
+// AddFile reads,  parses and save info about given file and its links
 func (s *ImageSync) AddFile(relativePath string) {
 	s.Files[relativePath] = []LinkInfo{}
 	data, err := s.ReadFile(relativePath)
@@ -100,6 +101,7 @@ func (s *ImageSync) AddFile(relativePath string) {
 	s.saveLinks(relativePath, &images)
 }
 
+// clearLinkReferences deletes reference link->source in the cache
 func (s *ImageSync) clearLinkReferences(sourceFilePath string, linkPath string) {
 	delete(s.Images[linkPath], sourceFilePath)
 	if len(s.Images[linkPath]) == 0 {
@@ -107,7 +109,9 @@ func (s *ImageSync) clearLinkReferences(sourceFilePath string, linkPath string) 
 	}
 }
 
+// saveLinks updates links in the cache
 func (s *ImageSync) saveLinks(sourceFilePath string, links *[]LinkInfo) {
+	s.Files[sourceFilePath] = []LinkInfo{} // create new slice to clear previous links
 	for _, img := range *links {
 		if s.Images[img.rootPath] == nil {
 			s.Images[img.rootPath] = map[string]struct{}{}
@@ -117,7 +121,7 @@ func (s *ImageSync) saveLinks(sourceFilePath string, links *[]LinkInfo) {
 	}
 }
 
-// Remove a file and its images from the ImageSync struct
+// RemoveFile removes a file and its images from the cache
 func (s *ImageSync) RemoveFile(relativePath string) {
 	if images, ok := s.Files[relativePath]; ok {
 		for _, li := range images {
@@ -127,7 +131,8 @@ func (s *ImageSync) RemoveFile(relativePath string) {
 	}
 }
 
-// MoveFile moves file in cache from `oldPath` to `newPath`.
+// MoveFile moves a file in the cache from `oldPath` to `newPath`
+// and update links in the file's content.
 // `moves` is a map of all moved files including linked files, it is used to
 // correctly replace paths if source file and its links were moved simultaneously.
 func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
@@ -183,18 +188,55 @@ func (s *ImageSync) UpdateLinksInFile(relativePath string, links []MovedLink) er
 	return nil
 }
 
+// Sync receives a map of moved files (from->to) and synchronize files,
+// by updating links in notes and updating cache.
 func (s *ImageSync) Sync(moves map[string]string) {
-	linkedFiles := map[string]string{}
+	// 1) At first, update the files that were moved and collect moved linked files
+	movedLinks := map[string]string{}
 	for from, to := range moves {
 		if _, ok := s.Files[from]; ok {
 			s.MoveFile(from, to, moves)
 		}
 		if s.Images[from] != nil { // if linked file was moved store it in the map
-			linkedFiles[from] = to
+			movedLinks[from] = to
 		}
 	}
-	// TODO: replace rest of the links using linkedFiles,
-	// TODO: references to the moved source files should be already removed
+	// 2) Then synchronize rest of the files that depends on moved linked files
+	fileMap := s.getFilesToSync(movedLinks)
+	for sourceFile, links := range fileMap {
+		err := s.UpdateLinksInFile(sourceFile, links)
+		if err != nil {
+			fmt.Printf("Couldn't update links in %s. Error: %v", sourceFile, err)
+		}
+	}
+}
+
+// getFilesToSync collects notes that should be updated due to linked files relocation
+func (s *ImageSync) getFilesToSync(movedLinks map[string]string) map[string][]MovedLink {
+	fileMap := map[string][]MovedLink{}
+	for from := range movedLinks {
+		files, ok := s.Images[from]
+		if !ok {
+			continue
+		}
+		for fpath := range files {
+			if _, ok := fileMap[fpath]; ok { // already added
+				continue
+			}
+			if _, ok := s.Files[fpath]; !ok { // file doesn't exist
+				continue
+			}
+			for _, li := range s.Files[fpath] { // check every link in the file
+				if linkTo, ok := movedLinks[li.rootPath]; ok {
+					// if link was moved, add file and its links to the map
+					fileMap[fpath] = append(fileMap[fpath], MovedLink{
+						from: li.rootPath, to: linkTo, link: li.originalLink,
+					})
+				}
+			}
+		}
+	}
+	return fileMap
 }
 
 func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {

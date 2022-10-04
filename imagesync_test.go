@@ -122,20 +122,23 @@ func TestUpdateImageLinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("update image links in the files", func(t *testing.T) {
-		want := map[string]string{
-			note: `![alt text](../imgs/renamed.png)\n![alt text](./assets/image02.png)`,
-		}
-		assert.Equal(t, want, *written)
-	})
+	want := map[string]string{
+		note: `![alt text](../imgs/renamed.png)\n![alt text](./assets/image02.png)`,
+	}
+	assert.Equal(t, want, *written, "image links in the file should be updated")
 
-	t.Run("update images in the imagesync struct", func(t *testing.T) {
-		for _, img := range imgs {
-			assert.NotContains(t, iSync.Images, img.from)
-			assert.Contains(t, iSync.Images, img.to)
-			assert.Contains(t, iSync.Images[img.to], note)
-		}
-	})
+	for _, img := range imgs {
+		assert.NotContains(t, iSync.Images, img.from, "should remove old path")
+		assert.Contains(t, iSync.Images, img.to, "should add new path")
+		assert.Contains(t, iSync.Images[img.to], note, "should have reference to the source file")
+	}
+
+	assert.Contains(t, iSync.Files[note],
+		LinkInfo{rootPath: "notes/imgs/renamed.png", originalLink: "../imgs/renamed.png"},
+		"should contain updated link")
+	assert.NotContains(t, iSync.Files[note],
+		LinkInfo{rootPath: imgs[0].from, originalLink: imgs[0].link},
+		"old link should be removed")
 }
 
 func TestSync(t *testing.T) {
@@ -144,7 +147,7 @@ func TestSync(t *testing.T) {
 	iSync.Files = filesWithLinks
 	iSync.Images = linkedFiles
 
-	notes := []struct {
+	movedNotes := []struct {
 		from string
 		to   string
 		body string
@@ -165,7 +168,7 @@ func TestSync(t *testing.T) {
 		"notes/index.png":                 "notes/index_assets/index.png",
 	}
 	moves := make(map[string]string)
-	for _, v := range notes {
+	for _, v := range movedNotes {
 		moves[v.from] = v.to
 		fs[v.to] = &fstest.MapFile{Data: fs[v.from].Data}
 	}
@@ -176,25 +179,42 @@ func TestSync(t *testing.T) {
 	written, restore := mockWriteFile(t)
 	t.Cleanup(func() { restore() })
 
-	t.Run("sync moved files", func(t *testing.T) {
-		iSync.Sync(moves)
-		for _, n := range notes {
+	iSync.Sync(moves)
+
+	t.Run("check info of the moved notes in the cache", func(t *testing.T) {
+		for _, n := range movedNotes {
 			assert.NotContains(t, iSync.Files, n.from, "should remove old path")
 			assert.Contains(t, iSync.Files, n.to, "should add new path")
+
 			assert.Equalf(t, n.body, (*written)[n.to], "should update links in the %s's", n.to)
 		}
-
 	})
 
-	t.Run("sync not displaced files with moved links", func(t *testing.T) {
-		// note moved file with updated links
-		note := "notes/index.md"
-		assert.Contains(t, iSync.Files, note)
-		ok := assert.Contains(t, *written, note, "should write updated body")
-		if ok {
-			assert.Equalf(t, "![alt text](index_assets/index.png)", (*written)[note], "should update links in the %s's", note)
+	t.Run("test linked files in cache", func(t *testing.T) {
+		for from, to := range links {
+			assert.NotContains(t, iSync.Images, from, "old path to linked files should be removed")
+			assert.Contains(t, iSync.Images, to, "new path to linked files should be saved")
 		}
 
-		t.Error("TODO:")
+		assert.Equal(t, map[string]struct{}{
+			movedNotes[0].to: {},
+		}, iSync.Images["notes/images/image01.png"])
+
 	})
+
+	t.Run("check info of the static note in the cache", func(t *testing.T) {
+		staticNote := "notes/index.md"
+
+		if assert.Contains(t, iSync.Files, staticNote) {
+			assert.Equal(t, []LinkInfo{{
+				rootPath:     "notes/index_assets/index.png",
+				originalLink: "index_assets/index.png",
+			}}, iSync.Files[staticNote])
+		}
+
+		if assert.Contains(t, *written, staticNote, "should write updated body") {
+			assert.Equalf(t, "![alt text](index_assets/index.png)", (*written)[staticNote], "should update links in the %s's", staticNote)
+		}
+	})
+
 }
