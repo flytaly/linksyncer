@@ -25,10 +25,8 @@ var testFiles = map[string]testFile{
 		fType:   skip,
 	},
 	"notes/folder/note.md": {
-		mapFile: &fstest.MapFile{Data: []byte(
-			`![alt text](./assets/image01.png)
-             ![alt text](./assets/image02.png)`)},
-		fType: parsable,
+		mapFile: &fstest.MapFile{Data: []byte(`![alt text](./assets/image01.png)\n![alt text](./assets/image02.png)`)},
+		fType:   parsable,
 		hasLinks: []LinkInfo{
 			{rootPath: "notes/folder/assets/image01.png", originalLink: "./assets/image01.png"},
 			{rootPath: "notes/folder/assets/image02.png", originalLink: "./assets/image02.png"},
@@ -39,6 +37,11 @@ var testFiles = map[string]testFile{
 		fType:    parsable,
 		hasLinks: []LinkInfo{{rootPath: "notes/folder/assets/image02.png", originalLink: "./assets/image02.png"}},
 	},
+	"notes/index.md": {
+		mapFile:  &fstest.MapFile{Data: []byte("![alt text](./index.png)")},
+		fType:    parsable,
+		hasLinks: []LinkInfo{{rootPath: "notes/index.png", originalLink: "./index.png"}},
+	},
 	"notes/folder/assets/image01.png": {
 		mapFile:   &fstest.MapFile{},
 		fType:     image,
@@ -48,6 +51,11 @@ var testFiles = map[string]testFile{
 		mapFile:   &fstest.MapFile{},
 		fType:     image,
 		wasLinked: []string{"notes/folder/note.md", "notes/folder/note2.md"},
+	},
+	"notes/index.png": {
+		mapFile:   &fstest.MapFile{},
+		fType:     image,
+		wasLinked: []string{"notes/index.md"},
 	},
 }
 

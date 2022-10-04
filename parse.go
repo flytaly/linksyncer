@@ -23,9 +23,9 @@ type LinkInfo struct {
 }
 
 type MovedLink struct {
-	prevPath string
-	newPath  string
-	link     string
+	from string
+	to   string
+	link string
 }
 
 // return flat slice of non-empty capturing groups
@@ -100,10 +100,10 @@ func ReplaceImageLinks(fPath string, fileContent []byte, imgs []MovedLink) []byt
 	for _, img := range imgs {
 		targpath := ""
 		if !filepath.IsAbs(img.link) {
-			targpath, _ = filepath.Rel(filepath.Dir(fPath), img.newPath)
+			targpath, _ = filepath.Rel(filepath.Dir(fPath), img.to)
 		}
 		if targpath == "" {
-			targpath = img.newPath
+			targpath = img.to
 		}
 
 		result = bytes.ReplaceAll(result, []byte(img.link), []byte(targpath))

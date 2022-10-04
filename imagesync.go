@@ -127,27 +127,36 @@ func (s *ImageSync) RemoveFile(relativePath string) {
 	}
 }
 
-func (s *ImageSync) RenameFile(prevPath, newPath string) {
-	if links, ok := s.Files[prevPath]; ok {
-		s.Files[newPath] = s.Files[prevPath]
-		delete(s.Files, prevPath)
-		if len(s.Files[newPath]) == 0 {
-			return
+// MoveFile moves file in cache from `oldPath` to `newPath`.
+// `moves` is a map of all moved files including linked files, it is used to
+// correctly replace paths if source file and its links were moved simultaneously.
+func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
+	links, ok := s.Files[oldPath]
+	if !ok {
+		return
+	}
+	s.Files[newPath] = s.Files[oldPath]
+	delete(s.Files, oldPath)
+	if len(links) == 0 {
+		return
+	}
+	// collect all the links in the file,
+	// in linked files were also moved, use their new location
+	movedLinks := []MovedLink{}
+	if moves == nil {
+		moves = map[string]string{}
+	}
+	for _, li := range links {
+		ml := MovedLink{from: li.rootPath, to: moves[li.rootPath], link: li.originalLink}
+		if ml.to == "" { // linked file wasn't moved
+			ml.to = li.rootPath
 		}
-		// update links
-		movedLinks := []MovedLink{}
-		for _, li := range links {
-			movedLinks = append(movedLinks, MovedLink{
-				prevPath: li.rootPath,
-				newPath:  li.rootPath,
-				link:     li.originalLink,
-			})
-			s.clearLinkReferences(prevPath, li.rootPath)
-		}
-		err := s.UpdateLinksInFile(newPath, movedLinks)
-		if err != nil {
-			fmt.Println("Couldn't update links in", newPath, err)
-		}
+		movedLinks = append(movedLinks, ml)
+		s.clearLinkReferences(oldPath, li.rootPath)
+	}
+	err := s.UpdateLinksInFile(newPath, movedLinks)
+	if err != nil {
+		fmt.Printf("Couldn't update links in %s. Error: %v", newPath, err)
 	}
 }
 
@@ -167,11 +176,25 @@ func (s *ImageSync) UpdateLinksInFile(relativePath string, links []MovedLink) er
 
 	images := extractImages(relativePath, string(updated))
 	for _, link := range links {
-		s.clearLinkReferences(relativePath, link.prevPath)
+		s.clearLinkReferences(relativePath, link.from)
 	}
 	s.saveLinks(relativePath, &images)
 
 	return nil
+}
+
+func (s *ImageSync) Sync(moves map[string]string) {
+	linkedFiles := map[string]string{}
+	for from, to := range moves {
+		if _, ok := s.Files[from]; ok {
+			s.MoveFile(from, to, moves)
+		}
+		if s.Images[from] != nil { // if linked file was moved store it in the map
+			linkedFiles[from] = to
+		}
+	}
+	// TODO: replace rest of the links using linkedFiles,
+	// TODO: references to the moved source files should be already removed
 }
 
 func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
@@ -192,13 +215,4 @@ func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
 	}
 
 	return data, nil
-}
-
-func filter(ss []string, test func(string) bool) (res []string) {
-	for _, s := range ss {
-		if test(s) {
-			res = append(res, s)
-		}
-	}
-	return
 }
