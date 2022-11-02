@@ -30,6 +30,9 @@ var watchedExt = regexp.MustCompile("(?i)(" + ImgExtensions + "|" + ParsableFile
 func shouldSkipPath(fi fs.FileInfo) bool {
 	name := fi.Name()
 	if fi.IsDir() {
+		if name == "." { // don't skip root folder
+			return false
+		}
 		// TODO: should be optional
 		return strings.HasPrefix(name, ".") || ExcludedDirs[name]
 	}
