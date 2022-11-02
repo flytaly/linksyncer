@@ -55,7 +55,7 @@ func (p *fsPoller) Add(name string) (map[string]*fs.FileInfo, error) {
 		}
 	}
 
-	list, err := p.listDirFiles(relativePath)
+	list, err := p.listDirFiles(relativePath, true)
 	if err != nil /* && errors.Is(err, fs.ErrNotExist) */ {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (p *fsPoller) Add(name string) (map[string]*fs.FileInfo, error) {
 
 // listDirFiles returns list of the files if name is a directory,
 // if name isn't a directory then just returns it's FileInfo.
-func (p *fsPoller) listDirFiles(name string) (map[string]*fs.FileInfo, error) {
+func (p *fsPoller) listDirFiles(name string, recursively bool) (map[string]*fs.FileInfo, error) {
 	files := map[string]*fs.FileInfo{}
 
 	fInfo, err := fs.Stat(p.fsys, name)
@@ -84,22 +84,23 @@ func (p *fsPoller) listDirFiles(name string) (map[string]*fs.FileInfo, error) {
 		return files, nil
 	}
 
-	dirEntires, err := fs.ReadDir(p.fsys, name)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, de := range dirEntires {
-		path := filepath.Join(name, de.Name())
-		stat, err := de.Info()
+	fs.WalkDir(p.fsys, name, func(path string, d fs.DirEntry, err error) error {
+		stat, err := d.Info()
 		if err != nil {
-			continue
+			return err
 		}
 		if p.shouldSkip != nil && p.shouldSkip(stat) { // skip
-			continue
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		files[path] = &stat
-	}
+		if d.IsDir() && path != name && !recursively {
+			return filepath.SkipDir
+		}
+		return nil
+	})
 
 	return files, nil
 }
@@ -113,10 +114,10 @@ func (p *fsPoller) scanForChanges() {
 	updated := map[string]*fs.FileInfo{}
 
 	for path := range p.watches {
-		files, err := p.listDirFiles(path)
+		files, err := p.listDirFiles(path, true)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
-				p.onWatchedPathRemoved(path)
+				delete(p.watches, path)
 				continue
 			}
 			p.errors <- err
@@ -137,21 +138,6 @@ func (p *fsPoller) scanForChanges() {
 	for name, info := range addedFiles {
 		p.files[name] = info
 		p.sendEvent(Event{Op: Create, Name: name})
-	}
-}
-
-// onWatchedPathRemoved removes path from watched paths and remove info of its files/subfolders.
-// Path itself should still be presented in the files map to trigger the corresponding event later.
-func (p *fsPoller) onWatchedPathRemoved(path string) {
-	delete(p.watches, path)
-	info := p.files[path]
-	if info != nil && !(*info).IsDir() {
-		return
-	}
-	for file := range p.files {
-		if filepath.Dir(file) == path {
-			delete(p.files, file)
-		}
 	}
 }
 

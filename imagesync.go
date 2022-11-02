@@ -57,7 +57,6 @@ var writeFile = func(absPath string, data []byte) error {
 }
 
 func (s *ImageSync) processDirs(dirs []string) {
-	nestedDirs := []string{}
 	for _, current := range dirs {
 		paths, err := s.watcher.Add(current)
 		if err != nil {
@@ -67,15 +66,8 @@ func (s *ImageSync) processDirs(dirs []string) {
 		for f, fi := range paths {
 			if !(*fi).IsDir() && s.isParsable(f) {
 				s.AddFile(f)
-				continue
-			}
-			if f != "." && f != current {
-				nestedDirs = append(nestedDirs, f)
 			}
 		}
-	}
-	if len(nestedDirs) > 0 {
-		s.processDirs(nestedDirs)
 	}
 }
 

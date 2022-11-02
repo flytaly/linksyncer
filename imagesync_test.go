@@ -24,7 +24,7 @@ func mockWriteFile(t *testing.T) (*map[string]string, func()) {
 
 func TestProcessFiles(t *testing.T) {
 	mapFS, wantFiles, wantRefs := GetTestFileSys()
-	iSync := New(mapFS, ".")
+	iSync := New(mapFS, "notes")
 	iSync.ProcessFiles()
 	assert.Equal(t, wantFiles, iSync.Files)
 	assert.Equal(t, wantRefs, iSync.Images)

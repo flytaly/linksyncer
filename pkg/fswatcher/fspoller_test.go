@@ -49,30 +49,22 @@ func createFS(files []string) fstest.MapFS {
 
 func TestAdd(t *testing.T) {
 	t.Run("add files", func(t *testing.T) {
-		root := "path"
+		root := j("path", "notes")
 
 		fileList := []string{
-			j(root, "notes"),
-			j(root, "notes", "note.md"),
-			j(root, "notes", "some_dir"),
-			j(root, "notes", "some_dir", "note2.md"),
-			j(root, "notes", "ignored_dir"),
+			root,
+			j(root, "note.md"),
+			j(root, "some_dir"),
+			j(root, "some_dir", "note2.md"),
 		}
 
 		fsys := createFS(fileList)
-		fsys[j(root, "notes", "ignored_dir", "file1.md")] = &fstest.MapFile{}
 
-		watches := map[string]struct{}{
-			j(root, "notes"):             {},
-			j(root, "notes", "some_dir"): {},
-		}
+		watches := map[string]struct{}{root: {}}
 
-		p := makePoller(fsys, ".")
-
-		for name := range watches {
-			_, err := p.Add(name)
-			failIfErr(t, err)
-		}
+		p := makePoller(fsys, root)
+		_, err := p.Add(root)
+		failIfErr(t, err)
 
 		if !reflect.DeepEqual(p.watches, watches) {
 			t.Errorf("watches: got %v, want %v", p.watches, watches)
@@ -199,13 +191,16 @@ func TestEvent(t *testing.T) {
 
 	t.Run("REMOVE watched path", func(t *testing.T) {
 		fsys := createFS([]string{
-			j("folder1", "file1.png"),
+			j("folder", "file1.png"),
 			j("temp", "file2.png"),
-			"tempFile.txt",
 		})
-		pathToRemove := []string{"tempFile.txt", "temp"}
+		pathToRemove := []string{"temp"}
 		p := makePoller(fsys, ".")
-		p.Add(".")
+		p.Add("folder")
+		p.Add("temp")
+
+		assert.Contains(t, p.watches, "folder")
+		assert.Contains(t, p.watches, "temp")
 
 		evs := map[string]Event{}
 		for _, f := range pathToRemove {
@@ -234,11 +229,14 @@ func TestEvent(t *testing.T) {
 	})
 
 	t.Run("RENAME", func(t *testing.T) {
-		fsys := createFS([]string{"file1.txt", "file2.txt"})
+		fsys := createFS([]string{"file1.txt", "file2.txt", j("folder/"), j("folder", "file3.txt")})
 		p := makePoller(fsys, ".")
 		p.Add(".")
 
-		rename := map[string]string{"file2.txt": "renamed.txt"}
+		rename := map[string]string{
+			"file2.txt":           "renamed.txt",
+			j("folder/file3.txt"): "renamed2.txt",
+		}
 
 		evs := map[string]Event{}
 		for from, to := range rename {
@@ -265,31 +263,33 @@ func TestEvent(t *testing.T) {
 	})
 
 	t.Run("RENAME watched path", func(t *testing.T) {
-		dirFrom := "temp"
-		dirTo := "renamed"
-		fileFrom := j(dirFrom, "file.png")
-		fileTo := j(dirTo, "file.png")
-		fsys := createFS([]string{fileFrom})
+		dir1 := "temp"
+		dir2 := "another_dir"
+		moveFrom := j(dir1, "file1.png")
+		moveTo := j(dir2, dir1, "file1.png")
+		fsys := createFS([]string{moveFrom, dir2})
 		p := makePoller(fsys, ".")
-		p.Add(".")
-		p.Add(dirFrom)
+		p.Add(dir1)
+		p.Add(dir2)
 
 		evs := map[string]Event{}
-		evs[dirFrom] = Event{Op: Rename, Name: dirFrom, NewPath: dirTo}
+		evs[dir1] = Event{Op: Rename, Name: dir1, NewPath: j(dir2, dir1)}
+		evs[moveFrom] = Event{Op: Rename, Name: moveFrom, NewPath: moveTo}
 		ExpectEvents(t, p, minWait, evs)
 
 		go p.Start(0)
 
 		go func() {
 			time.Sleep(time.Millisecond * 2)
-			fsys[fileTo] = fsys[fileFrom]
-			delete(fsys, fileFrom)
+			fsys[moveTo] = fsys[moveFrom]
+			delete(fsys, moveFrom)
+			delete(fsys, dir1)
 		}()
 
 		<-p.done
-		assert.NotContainsf(t, p.files, dirFrom, "shouldn't contain previous path")
-		assert.NotContainsf(t, p.files, fileFrom, "shouldn't contain previous path")
-		assert.NotContainsf(t, p.watches, dirFrom, "shouldn't watch removed path")
+		assert.NotContainsf(t, p.files, dir1, "shouldn't contain previous path")
+		assert.NotContainsf(t, p.files, moveFrom, "shouldn't contain previous path")
+		assert.NotContainsf(t, p.watches, dir1, "shouldn't watch removed path")
 	})
 
 	t.Run("WRITE", func(t *testing.T) {
@@ -325,17 +325,18 @@ func TestEvent(t *testing.T) {
 
 func TestShouldSkipHook(t *testing.T) {
 	t.Run("skip files", func(t *testing.T) {
-		skip := []string{"node_modules", "movie.mp4", "skip.txt"}
-		noskip := []string{"note.md"}
+		root := "folder"
+		skip := []string{j(root, "node_modules"), j(root, "movie.mp4"), j(root, "skip.txt")}
+		noskip := []string{j(root, "note.md")}
 		fsys := createFS(noskip)
 		for _, f := range skip {
 			fsys[f] = &fstest.MapFile{}
 		}
-		p := makePoller(fsys, ".")
+		p := makePoller(fsys, root)
 		p.AddShouldSkipHook(func(fi fs.FileInfo) bool {
-			return filepath.Ext(fi.Name()) != ".md"
+			return !fi.IsDir() && filepath.Ext(fi.Name()) != ".md"
 		})
-		p.Add(".")
+		p.Add(root)
 
 		for _, f := range skip {
 			assert.NotContains(t, p.files, f)
