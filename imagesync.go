@@ -97,6 +97,18 @@ func (s *ImageSync) AddFile(relativePath string) {
 	s.saveLinks(relativePath, &images)
 }
 
+func (s *ImageSync) AddPath(path string) {
+	fi, err := fs.Stat(s.fileSystem, path)
+	if err != nil {
+		log.Printf("Couldn't get FileInfo %s. %s", path, err)
+		return
+	}
+	if !fi.IsDir() && s.isParsable(path) {
+		s.AddFile(path)
+		log.Println("Added file: ", path)
+	}
+}
+
 // clearLinkReferences deletes reference link->source in the cache
 func (s *ImageSync) clearLinkReferences(sourceFilePath string, linkPath string) {
 	delete(s.Images[linkPath], sourceFilePath)
@@ -125,6 +137,18 @@ func (s *ImageSync) RemoveFile(relativePath string) {
 		}
 		delete(s.Files, relativePath)
 	}
+}
+
+func (s *ImageSync) UpdateFile(relativePath string) {
+	if images, ok := s.Files[relativePath]; ok {
+		for _, li := range images {
+			s.clearLinkReferences(relativePath, li.rootPath)
+		}
+		s.AddFile(relativePath)
+		log.Println("Updated file: ", relativePath)
+		return
+	}
+	s.AddPath(relativePath)
 }
 
 // MoveFile moves a file in the cache from `oldPath` to `newPath`
@@ -264,22 +288,11 @@ func (s *ImageSync) Watch(interval time.Duration) {
 			case event := <-s.Watcher.Events():
 				switch event.Op {
 				case fswatcher.Create:
-					fi, err := fs.Stat(s.fileSystem, event.Name)
-					if err != nil {
-						log.Printf("Couldn't get FileInfo %s. %s", event.Name, err)
-						break
-					}
-					if !fi.IsDir() && s.isParsable(event.Name) {
-						s.AddFile(event.Name)
-						log.Println("Added file: ", event.Name)
-					}
+					s.AddPath(event.Name)
 				case fswatcher.Remove:
 					s.RemoveFile(event.Name)
 				case fswatcher.Write:
-					if _, ok := s.Files[event.Name]; ok {
-						log.Println("update: ", event.Name)
-						//TODO: add method to replace file
-					}
+					s.UpdateFile(event.Name)
 				case fswatcher.Rename:
 					// TODO: Group files in batches
 					log.Printf("rename: %s -> %s\n", event.Name, event.NewPath)

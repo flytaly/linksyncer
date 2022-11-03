@@ -65,6 +65,35 @@ func TestRemoveFile(t *testing.T) {
 
 }
 
+func TestUpdateFile(t *testing.T) {
+	t.Run("clear content", func(t *testing.T) {
+		fs, filesWithLinks, linkedFiles := GetTestFileSys()
+		iSync := New(fs, ".")
+		iSync.Files = filesWithLinks
+		iSync.Images = linkedFiles
+
+		file := "notes/folder/note.md"
+		fs[file] = &fstest.MapFile{Data: []byte("")}
+		iSync.UpdateFile(file)
+		assert.Equal(t, iSync.Files[file], []LinkInfo{})
+	})
+
+	t.Run("update file", func(t *testing.T) {
+		fs, filesWithLinks, linkedFiles := GetTestFileSys()
+		iSync := New(fs, ".")
+		iSync.Files = filesWithLinks
+		iSync.Images = linkedFiles
+
+		file := "notes/folder/note.md"
+		fs[file] = &fstest.MapFile{Data: []byte(`![alt text](./assets/image.png)`)}
+		iSync.UpdateFile(file)
+
+		newLinks := []LinkInfo{
+			{rootPath: "notes/folder/assets/image.png", originalLink: "./assets/image.png"}}
+		assert.Equal(t, iSync.Files[file], newLinks)
+	})
+
+}
 func TestMoveFile(t *testing.T) {
 	fs, filesWithLinks, linkedFiles := GetTestFileSys()
 	iSync := New(fs, ".")
