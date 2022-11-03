@@ -150,7 +150,7 @@ func (p *fsPoller) scanForChanges() {
 	for name, info := range addedFiles {
 		p.files[name] = info
 		if _, ok := renamed[name]; !ok {
-			p.sendEvent(Event{Op: Create, Name: name})
+			p.SendEvent(Event{Op: Create, Name: name})
 		}
 	}
 }
@@ -158,7 +158,7 @@ func (p *fsPoller) scanForChanges() {
 // onFileWrite checks if file with given path was changed, if positive triggers Write event
 func (p *fsPoller) onFileWrite(path string, oldFi, newFi *fs.FileInfo) bool {
 	if (*oldFi).ModTime() != (*newFi).ModTime() {
-		p.sendEvent(Event{Op: Write, Name: path})
+		p.SendEvent(Event{Op: Write, Name: path})
 		return true
 	}
 	return false
@@ -168,15 +168,15 @@ func (p *fsPoller) onFileWrite(path string, oldFi, newFi *fs.FileInfo) bool {
 func (p *fsPoller) onFileRemove(path string, created map[string]*fs.FileInfo, oldFi *fs.FileInfo, renamed map[string]*fs.FileInfo) {
 	for newPath, newFi := range created {
 		if sameFile(*oldFi, *newFi) {
-			p.sendEvent(Event{Op: Rename, Name: path, NewPath: newPath})
+			p.SendEvent(Event{Op: Rename, Name: path, NewPath: newPath})
 			renamed[newPath] = newFi
 			return
 		}
 	}
-	p.sendEvent(Event{Op: Remove, Name: path})
+	p.SendEvent(Event{Op: Remove, Name: path})
 }
 
-func (p *fsPoller) sendEvent(e Event) error {
+func (p *fsPoller) SendEvent(e Event) error {
 	select {
 	case p.events <- e:
 	case <-p.done:

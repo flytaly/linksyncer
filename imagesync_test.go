@@ -1,8 +1,10 @@
 package imagesync
 
 import (
+	"imagesync/pkg/fswatcher"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -246,4 +248,45 @@ func TestSync(t *testing.T) {
 		}
 	})
 
+}
+
+func TestEvent(t *testing.T) {
+	t.Run("CREATE", func(t *testing.T) {
+		var fs fstest.MapFS = make(map[string]*fstest.MapFile)
+		iSync := New(fs, ".")
+		iSync.Watch(time.Second)
+		name := "notes/note1.md"
+		fs[name] = &fstest.MapFile{Data: []byte("")}
+		iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Create})
+		assert.Contains(t, iSync.Files, name)
+		iSync.Close()
+	})
+
+	t.Run("REMOVE", func(t *testing.T) {
+		fs, filesWithLinks, linkedFiles := GetTestFileSys()
+		iSync := New(fs, ".")
+		iSync.Files = filesWithLinks
+		iSync.Images = linkedFiles
+		iSync.Watch(time.Second)
+		name := "notes/folder/note.md"
+		assert.Contains(t, iSync.Files, name)
+		iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Remove})
+		iSync.Watch(time.Millisecond * 5)
+		assert.NotContains(t, iSync.Files, name)
+		iSync.Close()
+	})
+
+	t.Run("WRITE", func(t *testing.T) {
+		fs, filesWithLinks, linkedFiles := GetTestFileSys()
+		iSync := New(fs, ".")
+		iSync.Files = filesWithLinks
+		iSync.Images = linkedFiles
+		iSync.Watch(time.Second)
+		name := "notes/folder/note.md"
+		fs[name] = &fstest.MapFile{Data: []byte("")}
+		iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Write})
+		iSync.Watch(time.Millisecond * 5)
+		assert.Equal(t, iSync.Files[name], []LinkInfo{})
+		iSync.Close()
+	})
 }

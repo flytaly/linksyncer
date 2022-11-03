@@ -50,6 +50,7 @@ type FsWatcher interface {
 	Close() error
 	Start(interval time.Duration) error
 	AddShouldSkipHook(func(fi fs.FileInfo) bool)
+	SendEvent(ev Event) error
 }
 
 // New creates a new Watcher.
