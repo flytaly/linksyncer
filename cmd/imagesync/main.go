@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"imagesync"
 	"log"
 	"os"
+	"os/signal"
+	"time"
 )
 
 func main() {
@@ -14,17 +15,22 @@ func main() {
 		log.Fatal(err)
 	}
 
+	done := make(chan struct{})
+	sign := make(chan os.Signal)
+	signal.Notify(sign, os.Kill, os.Interrupt)
+
 	isync := imagesync.New(os.DirFS(root), root)
 
 	isync.ProcessFiles()
 
-	fmt.Println("Files")
-	for k, v := range isync.Files {
-		fmt.Printf("%v -> %v\n", k, v)
-	}
+	isync.Watch(time.Millisecond * 500)
 
-	fmt.Println("Images")
-	for image, files := range isync.Images {
-		fmt.Printf("%v -> %v\n", image, files)
-	}
+	go func() {
+		<-sign
+		isync.Close()
+		close(done)
+	}()
+
+	<-done
+
 }

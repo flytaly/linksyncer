@@ -2,6 +2,7 @@ package fswatcher
 
 import (
 	"errors"
+	"fmt"
 	"imagesync/testutils"
 	"io/fs"
 	"os"
@@ -42,7 +43,7 @@ func createFS(files []string) fstest.MapFS {
 			ff[v] = &fstest.MapFile{Mode: os.ModeDir}
 			continue
 		}
-		ff[v] = &fstest.MapFile{}
+		ff[v] = &fstest.MapFile{Data: []byte(fmt.Sprintf("file content: %s", v))}
 	}
 	return ff
 }

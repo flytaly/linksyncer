@@ -41,7 +41,7 @@ func main() {
 		}
 	}()
 
-	go watcher.Start(time.Second * 1)
+	go watcher.Start(time.Millisecond * 500)
 
 	go func() {
 		<-sign

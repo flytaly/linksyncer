@@ -112,6 +112,7 @@ func (p *fsPoller) scanForChanges() {
 
 	addedFiles := map[string]*fs.FileInfo{}
 	updated := map[string]*fs.FileInfo{}
+	renamed := map[string]*fs.FileInfo{}
 
 	for path := range p.watches {
 		files, err := p.listDirFiles(path, true)
@@ -126,37 +127,49 @@ func (p *fsPoller) scanForChanges() {
 		p.separate(files, addedFiles, updated)
 	}
 
+	removed := []string{}
+
 	for path, oldInfo := range p.files {
 		newInfo, existed := updated[path]
 		if existed {
 			p.onFileWrite(path, oldInfo, newInfo)
 			continue
 		}
-		p.onFileRemove(path, addedFiles, oldInfo)
+		p.onFileRemove(path, addedFiles, oldInfo, renamed)
+		removed = append(removed, path)
+	}
+
+	for _, path := range removed {
+		delete(p.files, path)
+	}
+
+	for path, fi := range updated {
+		p.files[path] = fi
 	}
 
 	for name, info := range addedFiles {
 		p.files[name] = info
-		p.sendEvent(Event{Op: Create, Name: name})
+		if _, ok := renamed[name]; !ok {
+			p.sendEvent(Event{Op: Create, Name: name})
+		}
 	}
 }
 
 // onFileWrite checks if file with given path was changed, if positive triggers Write event
-func (p *fsPoller) onFileWrite(path string, oldFi, newFi *fs.FileInfo) {
+func (p *fsPoller) onFileWrite(path string, oldFi, newFi *fs.FileInfo) bool {
 	if (*oldFi).ModTime() != (*newFi).ModTime() {
-		p.files[path] = newFi
 		p.sendEvent(Event{Op: Write, Name: path})
+		return true
 	}
+	return false
 }
 
 // onFileRemove evaluates if path was removed or renamed and trigger corresponding event
-func (p *fsPoller) onFileRemove(path string, created map[string]*fs.FileInfo, oldFi *fs.FileInfo) {
-	delete(p.files, path)
+func (p *fsPoller) onFileRemove(path string, created map[string]*fs.FileInfo, oldFi *fs.FileInfo, renamed map[string]*fs.FileInfo) {
 	for newPath, newFi := range created {
 		if sameFile(*oldFi, *newFi) {
-			p.files[newPath] = newFi
 			p.sendEvent(Event{Op: Rename, Name: path, NewPath: newPath})
-			delete(created, newPath)
+			renamed[newPath] = newFi
 			return
 		}
 	}

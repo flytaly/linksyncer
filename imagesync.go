@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 )
 
 type ImageSync struct {
@@ -18,7 +19,7 @@ type ImageSync struct {
 	Files      map[string][]LinkInfo          // watching files
 	Images     map[string]map[string]struct{} // map images' paths to their text files
 
-	watcher fswatcher.FsWatcher
+	Watcher fswatcher.FsWatcher
 
 	mu *sync.Mutex
 }
@@ -46,7 +47,7 @@ func New(fileSystem fs.FS, root string) *ImageSync {
 	watcher.AddShouldSkipHook(shouldSkipPath)
 	return &ImageSync{
 		root:       root,
-		watcher:    watcher,
+		Watcher:    watcher,
 		Files:      map[string][]LinkInfo{},
 		Images:     map[string]map[string]struct{}{},
 		fileSystem: fileSystem,
@@ -61,7 +62,7 @@ var writeFile = func(absPath string, data []byte) error {
 
 func (s *ImageSync) processDirs(dirs []string) {
 	for _, current := range dirs {
-		paths, err := s.watcher.Add(current)
+		paths, err := s.Watcher.Add(current)
 		if err != nil {
 			fmt.Printf("Couldn't add folder %s to watcher: %v", current, err)
 			continue
@@ -252,4 +253,46 @@ func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func (s *ImageSync) Watch(interval time.Duration) {
+	go func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		for {
+			select {
+			case event := <-s.Watcher.Events():
+				switch event.Op {
+				case fswatcher.Create:
+					fi, err := fs.Stat(s.fileSystem, event.Name)
+					if err != nil {
+						log.Printf("Couldn't get FileInfo %s. %s", event.Name, err)
+						break
+					}
+					if !fi.IsDir() && s.isParsable(event.Name) {
+						s.AddFile(event.Name)
+						log.Println("Added file: ", event.Name)
+					}
+				case fswatcher.Remove:
+					s.RemoveFile(event.Name)
+				case fswatcher.Write:
+					if _, ok := s.Files[event.Name]; ok {
+						log.Println("update: ", event.Name)
+						//TODO: add method to replace file
+					}
+				case fswatcher.Rename:
+					// TODO: Group files in batches
+					log.Printf("rename: %s -> %s\n", event.Name, event.NewPath)
+				}
+			case err := <-s.Watcher.Errors():
+				log.Fatalln(err)
+			}
+		}
+	}()
+
+	go s.Watcher.Start(interval)
+}
+
+func (s *ImageSync) Close() {
+	s.Watcher.Close()
 }
