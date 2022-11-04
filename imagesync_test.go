@@ -250,7 +250,7 @@ func TestSync(t *testing.T) {
 
 }
 
-func TestEvent(t *testing.T) {
+func TestWatch(t *testing.T) {
 	t.Run("CREATE", func(t *testing.T) {
 		var fs fstest.MapFS = make(map[string]*fstest.MapFile)
 		iSync := New(fs, ".")
@@ -286,7 +286,36 @@ func TestEvent(t *testing.T) {
 		fs[name] = &fstest.MapFile{Data: []byte("")}
 		iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Write})
 		iSync.Watch(time.Millisecond * 5)
-		assert.Equal(t, iSync.Files[name], []LinkInfo{})
+		assert.Equal(t, []LinkInfo{}, iSync.Files[name])
 		iSync.Close()
+	})
+
+	t.Run("RENAME", func(t *testing.T) {
+		var fs fstest.MapFS = make(map[string]*fstest.MapFile)
+		noteFrom := "notes/other/note1.md"
+		noteTo := "notes/note1.md"
+		imgFrom := "notes/other/image1.png"
+		imgTo := "notes/assets/image1.png"
+		fs[noteFrom] = &fstest.MapFile{Data: []byte("![](./image1.png)")}
+		fs[imgFrom] = &fstest.MapFile{}
+
+		iSync := New(fs, ".")
+		iSync.ProcessFiles()
+		assert.Equal(t, iSync.Files[noteFrom], []LinkInfo{{rootPath: imgFrom, originalLink: "./image1.png"}})
+
+		gotData, restore := mockWriteFile(t)
+		t.Cleanup(func() { restore() })
+
+		fs[noteTo] = fs[noteFrom]
+		delete(fs, noteFrom)
+		fs[imgTo] = fs[imgFrom]
+		delete(fs, imgFrom)
+
+		iSync.Watch(time.Millisecond)
+		time.Sleep(time.Millisecond * 40)
+		iSync.Close()
+
+		expected := map[string]string{noteTo: "![](assets/image1.png)"}
+		assert.Equal(t, expected, *gotData)
 	})
 }

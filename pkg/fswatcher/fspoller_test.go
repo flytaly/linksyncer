@@ -367,6 +367,8 @@ func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[strin
 			case err := <-p.Errors():
 				t.Errorf("watcher error event: %s", err)
 				go p.Close()
+			case <-p.scanDone:
+				return
 			case <-p.done:
 				return
 			}

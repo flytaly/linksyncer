@@ -20,6 +20,7 @@ type fsPoller struct {
 	events     chan Event
 	errors     chan error
 	done       chan struct{}
+	scanDone   chan struct{}
 	shouldSkip func(fs.FileInfo) bool
 	fsys       fs.FS
 	// path to the root directory
@@ -232,6 +233,11 @@ func (p *fsPoller) Start(interval time.Duration) error {
 		}
 
 		p.scanForChanges()
+		select {
+		case p.scanDone <- struct{}{}:
+		case <-p.done:
+			return nil
+		}
 	}
 }
 
@@ -264,4 +270,8 @@ func (p *fsPoller) Errors() <-chan error {
 
 func (p *fsPoller) Events() <-chan Event {
 	return p.events
+}
+
+func (p *fsPoller) ScanComplete() <-chan struct{} {
+	return p.scanDone
 }

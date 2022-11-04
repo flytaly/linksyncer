@@ -35,6 +35,8 @@ func main() {
 			select {
 			case event := <-watcher.Events():
 				fmt.Printf("Event: %s, Path: %s, NewPath: %s\n", event.Op, event.Name, event.NewPath) // Print the event's info.
+			case <-watcher.ScanComplete():
+				// fmt.Println("Complete scan")
 			case err := <-watcher.Errors():
 				log.Fatalln(err)
 			}

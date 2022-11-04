@@ -283,6 +283,7 @@ func (s *ImageSync) Watch(interval time.Duration) {
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		moves := map[string]string{}
 		for {
 			select {
 			case event := <-s.Watcher.Events():
@@ -294,8 +295,13 @@ func (s *ImageSync) Watch(interval time.Duration) {
 				case fswatcher.Write:
 					s.UpdateFile(event.Name)
 				case fswatcher.Rename:
-					// TODO: Group files in batches
-					log.Printf("rename: %s -> %s\n", event.Name, event.NewPath)
+					moves[event.Name] = event.NewPath
+				}
+			case <-s.Watcher.ScanComplete():
+				s.Sync(moves)
+				for from := range moves {
+					log.Printf("File moved: %s -> %s\n", from, moves[from])
+					delete(moves, from)
 				}
 			case err := <-s.Watcher.Errors():
 				log.Fatalln(err)
