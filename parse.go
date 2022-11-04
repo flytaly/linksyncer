@@ -18,46 +18,49 @@ var htmlRegexp = regexp.MustCompile(htmlImage)
 var imageExtensions = regexp.MustCompile("(?i)(?:" + ImgExtensions + ")$")
 
 type LinkInfo struct {
-	rootPath     string
-	originalLink string
+	rootPath string
+	path     string
+	fullLink string
 }
 
 type MovedLink struct {
-	from string
 	to   string
-	link string
+	link LinkInfo
 }
 
-// return flat slice of non-empty capturing groups
-func extractSubmatches(groups [][]string) []string {
-	var result = []string{}
+// return slice of non-empty capturing groups
+func extractSubmatches(groups [][]string) [][]string {
+	var result = [][]string{}
 
 	for _, v := range groups {
+		matches := []string{v[0]}
 		for _, group := range v[1:] {
 			if group != "" {
-				result = append(result, group)
+				matches = append(matches, group)
 			}
 		}
+		result = append(result, matches)
 	}
+
 	return result
 }
 
-func GetImgsFromMD(content string) []string {
+func GetImgsFromMD(content string) [][]string {
 	return extractSubmatches(mdRegexp.FindAllStringSubmatch(content, -1))
 }
 
-func GetImgsFromHTML(content string) []string {
+func GetImgsFromHTML(content string) [][]string {
 	return extractSubmatches(htmlRegexp.FindAllStringSubmatch(content, -1))
 }
 
-func filterImages(paths []string) []string {
-	var result = []string{}
+func filterImages(paths [][]string) [][]string {
+	var result = [][]string{}
 
 	for _, v := range paths {
-		if strings.Contains(v, ":") { // probably an URL
+		if strings.Contains(v[1], ":") { // probably an URL
 			continue
 		}
-		if imageExtensions.MatchString(v) {
+		if imageExtensions.MatchString(v[1]) {
 			result = append(result, v)
 		}
 	}
@@ -67,27 +70,28 @@ func filterImages(paths []string) []string {
 
 // Extracts images from a file's content. filePath argument should be absolute.
 func GetImagesFromFile(filePath string, content string) []LinkInfo {
-	var imgPaths []string
+	var links [][]string
 	result := []LinkInfo{}
 
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md":
-		imgPaths = GetImgsFromMD(content)
+		links = GetImgsFromMD(content)
 	case ".html":
-		imgPaths = GetImgsFromHTML(content)
+		links = GetImgsFromHTML(content)
 	default:
 		return result
 	}
 
-	imgPaths = filterImages(imgPaths)
+	links = filterImages(links)
 
-	for _, p := range imgPaths {
-		if !filepath.IsAbs(p) {
+	for _, l := range links {
+		link, path := l[0], l[1]
+		if !filepath.IsAbs(l[1]) {
 			dir := filepath.Dir(filePath)
-			info := LinkInfo{originalLink: p, rootPath: filepath.Join(dir, p)}
+			info := LinkInfo{fullLink: link, path: path, rootPath: filepath.Join(dir, path)}
 			result = append(result, info)
 		} else {
-			result = append(result, LinkInfo{originalLink: p, rootPath: p})
+			result = append(result, LinkInfo{fullLink: link, path: path, rootPath: path})
 		}
 	}
 
@@ -99,14 +103,15 @@ func ReplaceImageLinks(fPath string, fileContent []byte, imgs []MovedLink) []byt
 
 	for _, img := range imgs {
 		targpath := ""
-		if !filepath.IsAbs(img.link) {
+		if !filepath.IsAbs(img.link.path) {
 			targpath, _ = filepath.Rel(filepath.Dir(fPath), img.to)
 		}
 		if targpath == "" {
 			targpath = img.to
 		}
-
-		result = bytes.ReplaceAll(result, []byte(img.link), []byte(targpath))
+		// Replace path in the link and then replace link in the file
+		newLink := strings.Replace(img.link.fullLink, img.link.path, targpath, 1)
+		result = bytes.ReplaceAll(result, []byte(img.link.fullLink), []byte(newLink))
 	}
 
 	return result

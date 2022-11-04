@@ -166,18 +166,18 @@ func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
 		return
 	}
 	// collect all the links in the file,
-	// in linked files were also moved, use their new location
+	// if linked files were also moved, use their new location
 	movedLinks := []MovedLink{}
 	if moves == nil {
 		moves = map[string]string{}
 	}
-	for _, li := range links {
-		ml := MovedLink{from: li.rootPath, to: moves[li.rootPath], link: li.originalLink}
+	for _, link := range links {
+		ml := MovedLink{to: moves[link.rootPath], link: link}
 		if ml.to == "" { // linked file wasn't moved
-			ml.to = li.rootPath
+			ml.to = link.rootPath
 		}
 		movedLinks = append(movedLinks, ml)
-		s.clearLinkReferences(oldPath, li.rootPath)
+		s.clearLinkReferences(oldPath, link.rootPath)
 	}
 	err := s.UpdateLinksInFile(newPath, movedLinks)
 	if err != nil {
@@ -201,7 +201,7 @@ func (s *ImageSync) UpdateLinksInFile(relativePath string, links []MovedLink) er
 
 	images := extractImages(relativePath, string(updated))
 	for _, link := range links {
-		s.clearLinkReferences(relativePath, link.from)
+		s.clearLinkReferences(relativePath, link.link.rootPath)
 	}
 	s.saveLinks(relativePath, &images)
 
@@ -246,12 +246,10 @@ func (s *ImageSync) getFilesToSync(movedLinks map[string]string) map[string][]Mo
 			if _, ok := s.Files[fpath]; !ok { // file doesn't exist
 				continue
 			}
-			for _, li := range s.Files[fpath] { // check every link in the file
-				if linkTo, ok := movedLinks[li.rootPath]; ok {
+			for _, link := range s.Files[fpath] { // check every link in the file
+				if linkTo, ok := movedLinks[link.rootPath]; ok {
 					// if link was moved, add file and its links to the map
-					fileMap[fpath] = append(fileMap[fpath], MovedLink{
-						from: li.rootPath, to: linkTo, link: li.originalLink,
-					})
+					fileMap[fpath] = append(fileMap[fpath], MovedLink{to: linkTo, link: link})
 				}
 			}
 		}
@@ -298,6 +296,9 @@ func (s *ImageSync) Watch(interval time.Duration) {
 					moves[event.Name] = event.NewPath
 				}
 			case <-s.Watcher.ScanComplete():
+				if len(moves) == 0 {
+					break
+				}
 				s.Sync(moves)
 				for from := range moves {
 					log.Printf("File moved: %s -> %s\n", from, moves[from])

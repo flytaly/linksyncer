@@ -28,19 +28,19 @@ var testFiles = map[string]testFile{
 		mapFile: &fstest.MapFile{Data: []byte(`![alt text](./assets/image01.png)\n![alt text](./assets/image02.png)`)},
 		fType:   parsable,
 		hasLinks: []LinkInfo{
-			{rootPath: "notes/folder/assets/image01.png", originalLink: "./assets/image01.png"},
-			{rootPath: "notes/folder/assets/image02.png", originalLink: "./assets/image02.png"},
+			{rootPath: "notes/folder/assets/image01.png", path: "./assets/image01.png", fullLink: "![alt text](./assets/image01.png)"},
+			{rootPath: "notes/folder/assets/image02.png", path: "./assets/image02.png", fullLink: "![alt text](./assets/image02.png)"},
 		},
 	},
 	"notes/folder/note2.md": {
 		mapFile:  &fstest.MapFile{Data: []byte("![alt text](./assets/image02.png)")},
 		fType:    parsable,
-		hasLinks: []LinkInfo{{rootPath: "notes/folder/assets/image02.png", originalLink: "./assets/image02.png"}},
+		hasLinks: []LinkInfo{{rootPath: "notes/folder/assets/image02.png", path: "./assets/image02.png", fullLink: "![alt text](./assets/image02.png)"}},
 	},
 	"notes/index.md": {
 		mapFile:  &fstest.MapFile{Data: []byte("![alt text](./index.png)")},
 		fType:    parsable,
-		hasLinks: []LinkInfo{{rootPath: "notes/index.png", originalLink: "./index.png"}},
+		hasLinks: []LinkInfo{{rootPath: "notes/index.png", path: "./index.png", fullLink: "![alt text](./index.png)"}},
 	},
 	"notes/folder/assets/image01.png": {
 		mapFile:   &fstest.MapFile{},
