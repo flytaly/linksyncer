@@ -2,7 +2,7 @@ package main
 
 import (
 	"imagesync"
-	"log"
+	Logger "imagesync/pkg/log"
 	"os"
 	"os/signal"
 	"time"
@@ -11,8 +11,11 @@ import (
 func main() {
 	root, err := os.Getwd()
 
+	log := Logger.New()
+
 	if err != nil {
-		log.Fatal(err)
+		log.Error("%s", err)
+		os.Exit(1)
 	}
 
 	done := make(chan struct{})

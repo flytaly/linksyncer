@@ -2,12 +2,20 @@ package imagesync
 
 import (
 	"imagesync/pkg/fswatcher"
+	"imagesync/pkg/log"
+	"io/fs"
 	"testing"
 	"testing/fstest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func NewTestISync(fs fs.FS, root string) *ImageSync {
+	return New(fs, root, func(is *ImageSync) {
+		is.log = log.NewEmptyLog()
+	})
+}
 
 func mockWriteFile(t *testing.T) (*map[string]string, func()) {
 	t.Helper()
@@ -26,7 +34,7 @@ func mockWriteFile(t *testing.T) (*map[string]string, func()) {
 
 func TestProcessFiles(t *testing.T) {
 	mapFS, wantFiles, wantRefs := GetTestFileSys()
-	iSync := New(mapFS, "notes")
+	iSync := NewTestISync(mapFS, "notes")
 	iSync.ProcessFiles()
 	assert.Equal(t, wantFiles, iSync.Files)
 	assert.Equal(t, wantRefs, iSync.Images)
@@ -39,7 +47,7 @@ func TestRemoveFile(t *testing.T) {
 	img2 := "notes/folder/assets/image02.png"
 	t.Run("remove note 1", func(t *testing.T) {
 		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
 
@@ -53,7 +61,7 @@ func TestRemoveFile(t *testing.T) {
 
 	t.Run("remove note 2", func(t *testing.T) {
 		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
 
@@ -70,7 +78,7 @@ func TestRemoveFile(t *testing.T) {
 func TestUpdateFile(t *testing.T) {
 	t.Run("clear content", func(t *testing.T) {
 		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
 
@@ -82,7 +90,7 @@ func TestUpdateFile(t *testing.T) {
 
 	t.Run("update file", func(t *testing.T) {
 		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
 
@@ -99,7 +107,7 @@ func TestUpdateFile(t *testing.T) {
 
 func TestMoveFile(t *testing.T) {
 	fs, filesWithLinks, linkedFiles := GetTestFileSys()
-	iSync := New(fs, ".")
+	iSync := NewTestISync(fs, ".")
 	iSync.Files = filesWithLinks
 	iSync.Images = linkedFiles
 
@@ -133,7 +141,7 @@ func TestMoveFile(t *testing.T) {
 
 func TestUpdateImageLinks(t *testing.T) {
 	fs, filesWithLinks, linkedFiles := GetTestFileSys()
-	iSync := New(fs, ".")
+	iSync := NewTestISync(fs, ".")
 	iSync.Files = filesWithLinks
 	iSync.Images = linkedFiles
 
@@ -175,7 +183,7 @@ func TestUpdateImageLinks(t *testing.T) {
 func TestSync(t *testing.T) {
 	t.Run("t1", func(t *testing.T) {
 		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
 
@@ -258,7 +266,7 @@ func TestSync(t *testing.T) {
 		to := "notes/note1.md"
 		fs[from] = &fstest.MapFile{Data: []byte("![](img1.png)\n!Some Text\n![](img1.png)")}
 		fs["notes/rnd/img1.jpg"] = &fstest.MapFile{Data: []byte("")}
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.ProcessFiles()
 
 		gotData, restore := mockWriteFile(t)
@@ -276,7 +284,7 @@ func TestSync(t *testing.T) {
 func TestWatch(t *testing.T) {
 	t.Run("CREATE", func(t *testing.T) {
 		var fs fstest.MapFS = make(map[string]*fstest.MapFile)
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.Watch(time.Second)
 		name := "notes/note1.md"
 		fs[name] = &fstest.MapFile{Data: []byte("")}
@@ -287,7 +295,7 @@ func TestWatch(t *testing.T) {
 
 	t.Run("REMOVE", func(t *testing.T) {
 		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
 		iSync.Watch(time.Second)
@@ -301,7 +309,7 @@ func TestWatch(t *testing.T) {
 
 	t.Run("WRITE", func(t *testing.T) {
 		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
 		iSync.Watch(time.Second)
@@ -322,7 +330,7 @@ func TestWatch(t *testing.T) {
 		fs[noteFrom] = &fstest.MapFile{Data: []byte("![](./image1.png)")}
 		fs[imgFrom] = &fstest.MapFile{}
 
-		iSync := New(fs, ".")
+		iSync := NewTestISync(fs, ".")
 		iSync.ProcessFiles()
 		assert.Equal(t, iSync.Files[noteFrom], []LinkInfo{{rootPath: imgFrom, path: "./image1.png", fullLink: "![](./image1.png)"}})
 

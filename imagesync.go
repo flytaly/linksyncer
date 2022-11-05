@@ -2,14 +2,16 @@ package imagesync
 
 import (
 	"imagesync/pkg/fswatcher"
+	"imagesync/pkg/log"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gookit/color"
 )
 
 type ImageSync struct {
@@ -20,7 +22,8 @@ type ImageSync struct {
 
 	Watcher fswatcher.FsWatcher
 
-	mu *sync.Mutex
+	log log.Logger
+	mu  *sync.Mutex
 }
 
 var parsableFiles = regexp.MustCompile("(?i)(" + ParsableFilesExtension + ")$")
@@ -41,17 +44,24 @@ func shouldSkipPath(fi fs.FileInfo) bool {
 }
 
 // Creates a new ImageSync
-func New(fileSystem fs.FS, root string) *ImageSync {
+func New(fileSystem fs.FS, root string, options ...func(*ImageSync)) *ImageSync {
 	watcher := fswatcher.NewFsPoller(fileSystem, root)
 	watcher.AddShouldSkipHook(shouldSkipPath)
-	return &ImageSync{
+	iSync := &ImageSync{
 		root:       root,
 		Watcher:    watcher,
 		Files:      map[string][]LinkInfo{},
 		Images:     map[string]map[string]struct{}{},
 		fileSystem: fileSystem,
 		mu:         new(sync.Mutex),
+		log:        log.New(),
 	}
+
+	for _, option := range options {
+		option(iSync)
+	}
+
+	return iSync
 }
 
 var extractImages = GetImagesFromFile
@@ -63,7 +73,7 @@ func (s *ImageSync) processDirs(dirs []string) {
 	for _, current := range dirs {
 		paths, err := s.Watcher.Add(current)
 		if err != nil {
-			log.Printf("Couldn't add folder %s to watcher: %v", current, err)
+			s.log.Error("Couldn't add folder %s to watcher: %v", current, err)
 			continue
 		}
 		for f, fi := range paths {
@@ -88,7 +98,7 @@ func (s *ImageSync) AddFile(relativePath string) {
 	s.Files[relativePath] = []LinkInfo{}
 	data, err := s.ReadFile(relativePath)
 	if err != nil {
-		log.Println("Couldn't read file.", err)
+		s.log.Error("Couldn't read file. %s", err)
 		return
 	}
 
@@ -99,12 +109,12 @@ func (s *ImageSync) AddFile(relativePath string) {
 func (s *ImageSync) AddPath(path string) {
 	fi, err := fs.Stat(s.fileSystem, path)
 	if err != nil {
-		log.Printf("Couldn't get FileInfo. %s", err)
+		s.log.Error("Couldn't get FileInfo. %s", err)
 		return
 	}
 	if !fi.IsDir() && s.isParsable(path) {
 		s.AddFile(path)
-		log.Println("Added file: ", path)
+		s.log.Info("Added file: %s", path)
 	}
 }
 
@@ -144,7 +154,7 @@ func (s *ImageSync) UpdateFile(relativePath string) {
 			s.clearLinkReferences(relativePath, li.rootPath)
 		}
 		s.AddFile(relativePath)
-		log.Println("Updated file: ", relativePath)
+		s.log.Info("Updated file: %s", relativePath)
 		return
 	}
 	s.AddPath(relativePath)
@@ -180,10 +190,10 @@ func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
 	}
 	err := s.UpdateLinksInFile(newPath, movedLinks)
 	if err != nil {
-		log.Printf("Couldn't update links in %s. Error: %v\n", newPath, err)
+		s.log.Error("Couldn't update links in %s. Error: %v\n", newPath, err)
 		return
 	}
-	log.Printf("File moved: %s -> %s\n", oldPath, newPath)
+	s.log.Info("File moved: %s -> %s\n", oldPath, newPath)
 }
 
 // UpdateLinksInFile replaces links in the file
@@ -227,7 +237,7 @@ func (s *ImageSync) Sync(moves map[string]string) {
 	for sourceFile, links := range fileMap {
 		err := s.UpdateLinksInFile(sourceFile, links)
 		if err != nil {
-			log.Printf("Couldn't update links in %s. Error: %v\n", sourceFile, err)
+			s.log.Error("Couldn't update links in %s. Error: %v\n", sourceFile, err)
 		}
 	}
 }
@@ -279,6 +289,7 @@ func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
 }
 
 func (s *ImageSync) Watch(interval time.Duration) {
+	s.log.Info(" %s  Watch path: %s", color.Green.Sprint("➜"), color.Cyan.Sprint(s.root))
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -305,7 +316,7 @@ func (s *ImageSync) Watch(interval time.Duration) {
 					delete(moves, from)
 				}
 			case err := <-s.Watcher.Errors():
-				log.Fatalln(err)
+				s.log.Error("%s", err)
 			}
 		}
 	}()
