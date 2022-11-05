@@ -1,7 +1,6 @@
 package imagesync
 
 import (
-	"fmt"
 	"imagesync/pkg/fswatcher"
 	"io/fs"
 	"log"
@@ -64,7 +63,7 @@ func (s *ImageSync) processDirs(dirs []string) {
 	for _, current := range dirs {
 		paths, err := s.Watcher.Add(current)
 		if err != nil {
-			fmt.Printf("Couldn't add folder %s to watcher: %v", current, err)
+			log.Printf("Couldn't add folder %s to watcher: %v", current, err)
 			continue
 		}
 		for f, fi := range paths {
@@ -89,7 +88,7 @@ func (s *ImageSync) AddFile(relativePath string) {
 	s.Files[relativePath] = []LinkInfo{}
 	data, err := s.ReadFile(relativePath)
 	if err != nil {
-		log.Println(err)
+		log.Println("Couldn't read file.", err)
 		return
 	}
 
@@ -100,7 +99,7 @@ func (s *ImageSync) AddFile(relativePath string) {
 func (s *ImageSync) AddPath(path string) {
 	fi, err := fs.Stat(s.fileSystem, path)
 	if err != nil {
-		log.Printf("Couldn't get FileInfo %s. %s", path, err)
+		log.Printf("Couldn't get FileInfo. %s", err)
 		return
 	}
 	if !fi.IsDir() && s.isParsable(path) {
@@ -181,8 +180,10 @@ func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
 	}
 	err := s.UpdateLinksInFile(newPath, movedLinks)
 	if err != nil {
-		fmt.Printf("Couldn't update links in %s. Error: %v", newPath, err)
+		log.Printf("Couldn't update links in %s. Error: %v\n", newPath, err)
+		return
 	}
+	log.Printf("File moved: %s -> %s\n", oldPath, newPath)
 }
 
 // UpdateLinksInFile replaces links in the file
@@ -226,7 +227,7 @@ func (s *ImageSync) Sync(moves map[string]string) {
 	for sourceFile, links := range fileMap {
 		err := s.UpdateLinksInFile(sourceFile, links)
 		if err != nil {
-			fmt.Printf("Couldn't update links in %s. Error: %v", sourceFile, err)
+			log.Printf("Couldn't update links in %s. Error: %v\n", sourceFile, err)
 		}
 	}
 }
@@ -301,7 +302,6 @@ func (s *ImageSync) Watch(interval time.Duration) {
 				}
 				s.Sync(moves)
 				for from := range moves {
-					log.Printf("File moved: %s -> %s\n", from, moves[from])
 					delete(moves, from)
 				}
 			case err := <-s.Watcher.Errors():

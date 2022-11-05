@@ -85,7 +85,7 @@ func (p *fsPoller) listDirFiles(name string, recursively bool) (map[string]*fs.F
 		return files, nil
 	}
 
-	fs.WalkDir(p.fsys, name, func(path string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(p.fsys, name, func(path string, d fs.DirEntry, err error) error {
 		stat, err := d.Info()
 		if err != nil {
 			return err
@@ -102,6 +102,10 @@ func (p *fsPoller) listDirFiles(name string, recursively bool) (map[string]*fs.F
 		}
 		return nil
 	})
+
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	return files, nil
 }
