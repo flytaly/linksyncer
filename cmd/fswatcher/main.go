@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -19,8 +20,8 @@ func main() {
 
 	done := make(chan struct{})
 
-	sign := make(chan os.Signal)
-	signal.Notify(sign, os.Kill, os.Interrupt)
+	sign := make(chan os.Signal, 1)
+	signal.Notify(sign, os.Interrupt, syscall.SIGTERM)
 
 	watcher := fswatcher.NewFsPoller(os.DirFS(root), root)
 
@@ -46,9 +47,12 @@ func main() {
 	go watcher.Start(time.Millisecond * 500)
 
 	go func() {
-		<-sign
+		s := <-sign
 		watcher.Close()
 		close(done)
+		if s == syscall.SIGTERM {
+			os.Exit(1)
+		}
 	}()
 
 	<-done

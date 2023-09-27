@@ -5,6 +5,7 @@ import (
 	Logger "imagesync/pkg/log"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -19,8 +20,8 @@ func main() {
 	}
 
 	done := make(chan struct{})
-	sign := make(chan os.Signal)
-	signal.Notify(sign, os.Kill, os.Interrupt)
+	sign := make(chan os.Signal, 1)
+	signal.Notify(sign, os.Interrupt, syscall.SIGTERM)
 
 	isync := imagesync.New(os.DirFS(root), root)
 
@@ -29,11 +30,13 @@ func main() {
 	isync.Watch(time.Millisecond * 500)
 
 	go func() {
-		<-sign
+		s := <-sign
 		isync.Close()
 		close(done)
+		if s == syscall.SIGTERM {
+			os.Exit(1)
+		}
 	}()
 
 	<-done
-
 }
