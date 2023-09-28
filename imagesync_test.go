@@ -288,7 +288,7 @@ func TestWatch(t *testing.T) {
 		iSync.Watch(time.Second)
 		name := "notes/note1.md"
 		fs[name] = &fstest.MapFile{Data: []byte("")}
-		iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Create})
+		_ = iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Create})
 		assert.Contains(t, iSync.Files, name)
 		iSync.Close()
 	})
@@ -301,7 +301,7 @@ func TestWatch(t *testing.T) {
 		iSync.Watch(time.Second)
 		name := "notes/folder/note.md"
 		assert.Contains(t, iSync.Files, name)
-		iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Remove})
+		_ = iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Remove})
 		iSync.Watch(time.Millisecond * 5)
 		assert.NotContains(t, iSync.Files, name)
 		iSync.Close()
@@ -315,7 +315,7 @@ func TestWatch(t *testing.T) {
 		iSync.Watch(time.Second)
 		name := "notes/folder/note.md"
 		fs[name] = &fstest.MapFile{Data: []byte("")}
-		iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Write})
+		_ = iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Write})
 		iSync.Watch(time.Millisecond * 5)
 		assert.Equal(t, []LinkInfo{}, iSync.Files[name])
 		iSync.Close()

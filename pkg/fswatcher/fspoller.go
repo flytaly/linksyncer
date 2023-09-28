@@ -86,6 +86,10 @@ func (p *fsPoller) listDirFiles(name string, recursively bool) (map[string]*fs.F
 	}
 
 	err = fs.WalkDir(p.fsys, name, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
 		stat, err := d.Info()
 		if err != nil {
 			return err
@@ -155,7 +159,10 @@ func (p *fsPoller) scanForChanges() {
 	for name, info := range addedFiles {
 		p.files[name] = info
 		if _, ok := renamed[name]; !ok {
-			p.SendEvent(Event{Op: Create, Name: name})
+			err := p.SendEvent(Event{Op: Create, Name: name})
+			if err != nil {
+				p.errors <- err
+			}
 		}
 	}
 }
@@ -163,7 +170,10 @@ func (p *fsPoller) scanForChanges() {
 // onFileWrite checks if file with given path was changed, if positive triggers Write event
 func (p *fsPoller) onFileWrite(path string, oldFi, newFi *fs.FileInfo) bool {
 	if (*oldFi).ModTime() != (*newFi).ModTime() {
-		p.SendEvent(Event{Op: Write, Name: path})
+		err := p.SendEvent(Event{Op: Write, Name: path})
+		if err != nil {
+			p.errors <- err
+		}
 		return true
 	}
 	return false
@@ -173,12 +183,18 @@ func (p *fsPoller) onFileWrite(path string, oldFi, newFi *fs.FileInfo) bool {
 func (p *fsPoller) onFileRemove(path string, created map[string]*fs.FileInfo, oldFi *fs.FileInfo, renamed map[string]*fs.FileInfo) {
 	for newPath, newFi := range created {
 		if sameFile(*oldFi, *newFi) {
-			p.SendEvent(Event{Op: Rename, Name: path, NewPath: newPath})
+			err := p.SendEvent(Event{Op: Rename, Name: path, NewPath: newPath})
+			if err != nil {
+				p.errors <- err
+			}
 			renamed[newPath] = newFi
 			return
 		}
 	}
-	p.SendEvent(Event{Op: Remove, Name: path})
+	err := p.SendEvent(Event{Op: Remove, Name: path})
+	if err != nil {
+		p.errors <- err
+	}
 }
 
 func (p *fsPoller) SendEvent(e Event) error {

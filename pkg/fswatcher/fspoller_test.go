@@ -98,10 +98,14 @@ func TestRemove(t *testing.T) {
 	t.Run("remove file", func(t *testing.T) {
 		fsys := createFS([]string{"path1", "path2"})
 		p := makePoller(fsys, ".")
-		p.Add("path1")
-		p.Add("path2")
-		p.Remove("path1")
-		_, err := fsys.Stat("path2")
+		_, err := p.Add("path1")
+		failIfErr(t, err)
+		_, err = p.Add("path2")
+		failIfErr(t, err)
+
+		err = p.Remove("path1")
+		failIfErr(t, err)
+		_, err = fsys.Stat("path2")
 		failIfErr(t, err)
 		assert.Contains(t, p.files, "path2")
 		assert.NotContains(t, p.files, "path1")
@@ -111,7 +115,10 @@ func TestRemove(t *testing.T) {
 func TestClose(t *testing.T) {
 	fsys := createFS([]string{"some_path"})
 	p := makePoller(fsys, ".")
-	go p.Start(time.Second)
+
+	go func() {
+		failIfErr(t, p.Start(time.Second))
+	}()
 
 	time.Sleep(time.Millisecond)
 	p.Close()
@@ -131,7 +138,8 @@ func TestEvent(t *testing.T) {
 	t.Run("CREATE", func(t *testing.T) {
 		fsys := createFS([]string{"file"})
 		p := makePoller(fsys, ".")
-		p.Add(".")
+		_, err := p.Add(".")
+		failIfErr(t, err)
 
 		newFiles := map[string]string{ // path => event's filename
 			"newFile1.txt":       "newFile1.txt",
@@ -145,7 +153,9 @@ func TestEvent(t *testing.T) {
 		}
 		ExpectEvents(t, p, minWait, evs)
 
-		go p.Start(0)
+		go func() {
+			failIfErr(t, p.Start(0))
+		}()
 
 		go func() {
 			time.Sleep(time.Millisecond * 2)
@@ -164,7 +174,8 @@ func TestEvent(t *testing.T) {
 	t.Run("REMOVE", func(t *testing.T) {
 		fsys := createFS([]string{"file1.txt", "file2.txt", "file3.txt"})
 		p := makePoller(fsys, ".")
-		p.Add(".")
+		_, err := p.Add(".")
+		failIfErr(t, err)
 
 		remove := []string{"file2.txt"}
 
@@ -174,7 +185,9 @@ func TestEvent(t *testing.T) {
 		}
 		ExpectEvents(t, p, minWait, evs)
 
-		go p.Start(0)
+		go func() {
+			failIfErr(t, p.Start(0))
+		}()
 
 		go func() {
 			time.Sleep(time.Millisecond * 2)
@@ -197,20 +210,25 @@ func TestEvent(t *testing.T) {
 		})
 		pathToRemove := []string{"temp"}
 		p := makePoller(fsys, ".")
-		p.Add("folder")
-		p.Add("temp")
+		_, err := p.Add("folder")
+		failIfErr(t, err)
+		_, err = p.Add("temp")
+		failIfErr(t, err)
 
 		assert.Contains(t, p.watches, "folder")
 		assert.Contains(t, p.watches, "temp")
 
 		evs := map[string]Event{}
 		for _, f := range pathToRemove {
-			p.Add(f)
+			_, err := p.Add(f)
+			failIfErr(t, err)
 			evs[f] = Event{Op: Remove, Name: f}
 		}
 		ExpectEvents(t, p, minWait, evs)
 
-		go p.Start(0)
+		go func() {
+			failIfErr(t, p.Start(0))
+		}()
 
 		go func() {
 			time.Sleep(time.Millisecond * 2)
@@ -232,7 +250,8 @@ func TestEvent(t *testing.T) {
 	t.Run("RENAME", func(t *testing.T) {
 		fsys := createFS([]string{"file1.txt", "file2.txt", j("folder/"), j("folder", "file3.txt")})
 		p := makePoller(fsys, ".")
-		p.Add(".")
+		_, err := p.Add(".")
+		failIfErr(t, err)
 
 		rename := map[string]string{
 			"file2.txt":           "renamed.txt",
@@ -245,7 +264,9 @@ func TestEvent(t *testing.T) {
 		}
 		ExpectEvents(t, p, minWait, evs)
 
-		go p.Start(0)
+		go func() {
+			failIfErr(t, p.Start(0))
+		}()
 
 		go func() {
 			time.Sleep(time.Millisecond * 2)
@@ -270,15 +291,19 @@ func TestEvent(t *testing.T) {
 		moveTo := j(dir2, dir1, "file1.png")
 		fsys := createFS([]string{moveFrom, dir2})
 		p := makePoller(fsys, ".")
-		p.Add(dir1)
-		p.Add(dir2)
+		_, err := p.Add(dir1)
+		failIfErr(t, err)
+		_, err = p.Add(dir2)
+		failIfErr(t, err)
 
 		evs := map[string]Event{}
 		evs[dir1] = Event{Op: Rename, Name: dir1, NewPath: j(dir2, dir1)}
 		evs[moveFrom] = Event{Op: Rename, Name: moveFrom, NewPath: moveTo}
 		ExpectEvents(t, p, minWait, evs)
 
-		go p.Start(0)
+		go func() {
+			failIfErr(t, p.Start(0))
+		}()
 
 		go func() {
 			time.Sleep(time.Millisecond * 2)
@@ -296,7 +321,8 @@ func TestEvent(t *testing.T) {
 	t.Run("WRITE", func(t *testing.T) {
 		fsys := createFS([]string{"file1.txt", "file2.txt"})
 		p := makePoller(fsys, ".")
-		p.Add(".")
+		_, err := p.Add(".")
+		failIfErr(t, err)
 
 		write := []string{"file2.txt"}
 
@@ -306,7 +332,9 @@ func TestEvent(t *testing.T) {
 		}
 		ExpectEvents(t, p, minWait, evs)
 
-		go p.Start(0)
+		go func() {
+			failIfErr(t, p.Start(0))
+		}()
 
 		go func() {
 			time.Sleep(time.Millisecond * 2)
@@ -337,7 +365,9 @@ func TestShouldSkipHook(t *testing.T) {
 		p.AddShouldSkipHook(func(fi fs.FileInfo) bool {
 			return !fi.IsDir() && filepath.Ext(fi.Name()) != ".md"
 		})
-		p.Add(root)
+
+		_, err := p.Add(root)
+		failIfErr(t, err)
 
 		for _, f := range skip {
 			assert.NotContains(t, p.files, f)
