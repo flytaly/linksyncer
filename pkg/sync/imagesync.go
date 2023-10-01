@@ -10,8 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/gookit/color"
 )
 
 type ImageSync struct {
@@ -289,7 +287,6 @@ func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
 }
 
 func (s *ImageSync) Watch(interval time.Duration) {
-	s.log.Info(" %s  Watch path: %s", color.Green.Sprint("➜"), color.Cyan.Sprint(s.root))
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -321,7 +318,10 @@ func (s *ImageSync) Watch(interval time.Duration) {
 		}
 	}()
 
-	go s.Watcher.Start(interval)
+	err := s.Watcher.Start(interval)
+	if err != nil {
+		s.log.Error("%s", err)
+	}
 }
 
 func (s *ImageSync) Close() {
