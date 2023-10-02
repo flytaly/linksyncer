@@ -144,7 +144,8 @@ func TestEvent(t *testing.T) {
 		newFiles := map[string]string{ // path => event's filename
 			"newFile1.txt":       "newFile1.txt",
 			"newFile2.txt":       "newFile2.txt",
-			"newFolder/file.txt": "newFolder",
+			"newFolder/":         "newFolder",
+			"newFolder/file.txt": "newFolder/file.txt",
 		}
 
 		evs := map[string]Event{}
@@ -204,26 +205,23 @@ func TestEvent(t *testing.T) {
 	})
 
 	t.Run("REMOVE watched path", func(t *testing.T) {
+		tempFolder, tempFile := "temp", j("temp", "file2.png")
 		fsys := createFS([]string{
 			j("folder", "file1.png"),
-			j("temp", "file2.png"),
+			tempFile,
 		})
-		pathToRemove := []string{"temp"}
 		p := makePoller(fsys, ".")
 		_, err := p.Add("folder")
 		failIfErr(t, err)
-		_, err = p.Add("temp")
+		_, err = p.Add(tempFolder)
 		failIfErr(t, err)
 
 		assert.Contains(t, p.watches, "folder")
-		assert.Contains(t, p.watches, "temp")
+		assert.Contains(t, p.watches, tempFolder)
 
 		evs := map[string]Event{}
-		for _, f := range pathToRemove {
-			_, err := p.Add(f)
-			failIfErr(t, err)
-			evs[f] = Event{Op: Remove, Name: f}
-		}
+		evs[tempFolder] = Event{Op: Remove, Name: "temp"}
+		evs[tempFile] = Event{Op: Remove, Name: tempFile}
 		ExpectEvents(t, p, minWait, evs)
 
 		go func() {
@@ -232,17 +230,13 @@ func TestEvent(t *testing.T) {
 
 		go func() {
 			time.Sleep(time.Millisecond * 2)
-			delete(fsys, j("temp", "file2.png"))
-			for _, f := range pathToRemove {
-				delete(fsys, f)
-			}
+			delete(fsys, tempFile)
+			delete(fsys, tempFolder)
 		}()
 
 		<-p.done
-		for _, f := range pathToRemove {
-			assert.NotContainsf(t, p.files, f, "shouldn't contain removed path")
-			assert.NotContainsf(t, p.watches, f, "shouldn't watch removed path")
-		}
+		assert.NotContainsf(t, p.files, tempFile, "shouldn't contain removed path")
+		assert.NotContainsf(t, p.watches, tempFile, "shouldn't watch removed path")
 
 		assert.NotContainsf(t, p.files, j("temp", "file2.png"), "shouldn't contain removed file")
 	})

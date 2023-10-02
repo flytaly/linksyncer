@@ -285,7 +285,7 @@ func TestWatch(t *testing.T) {
 	t.Run("CREATE", func(t *testing.T) {
 		var fs fstest.MapFS = make(map[string]*fstest.MapFile)
 		iSync := NewTestISync(fs, ".")
-		iSync.Watch(time.Second)
+		go iSync.Watch(time.Second)
 		name := "notes/note1.md"
 		fs[name] = &fstest.MapFile{Data: []byte("")}
 		_ = iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Create})
@@ -298,11 +298,11 @@ func TestWatch(t *testing.T) {
 		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
-		iSync.Watch(time.Second)
+		go iSync.Watch(time.Second)
 		name := "notes/folder/note.md"
 		assert.Contains(t, iSync.Files, name)
 		_ = iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Remove})
-		iSync.Watch(time.Millisecond * 5)
+		go iSync.Watch(time.Millisecond * 5)
 		assert.NotContains(t, iSync.Files, name)
 		iSync.Close()
 	})
@@ -312,11 +312,11 @@ func TestWatch(t *testing.T) {
 		iSync := NewTestISync(fs, ".")
 		iSync.Files = filesWithLinks
 		iSync.Images = linkedFiles
-		iSync.Watch(time.Second)
+		go iSync.Watch(time.Second)
 		name := "notes/folder/note.md"
 		fs[name] = &fstest.MapFile{Data: []byte("")}
 		_ = iSync.Watcher.SendEvent(fswatcher.Event{Name: name, Op: fswatcher.Write})
-		iSync.Watch(time.Millisecond * 5)
+		go iSync.Watch(time.Millisecond * 5)
 		assert.Equal(t, []LinkInfo{}, iSync.Files[name])
 		iSync.Close()
 	})
@@ -342,7 +342,7 @@ func TestWatch(t *testing.T) {
 		fs[imgTo] = fs[imgFrom]
 		delete(fs, imgFrom)
 
-		iSync.Watch(time.Millisecond)
+		go iSync.Watch(time.Millisecond)
 		time.Sleep(time.Millisecond * 40)
 		iSync.Close()
 
