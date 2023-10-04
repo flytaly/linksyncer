@@ -220,6 +220,8 @@ func (s *ImageSync) UpdateLinksInFile(relativePath string, links []MovedLink) er
 // Sync receives a map of moved files (from->to) and synchronize files,
 // by updating links in notes and updating cache.
 func (s *ImageSync) Sync(moves map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// 1) At first, update the files that were moved and collect moved linked files
 	movedLinks := map[string]string{}
 	for from, to := range moves {
@@ -286,42 +288,59 @@ func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
 	return data, nil
 }
 
-func (s *ImageSync) Watch(interval time.Duration) {
-	go func() {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		moves := map[string]string{}
-		for {
-			select {
-			case event := <-s.Watcher.Events():
-				switch event.Op {
-				case fswatcher.Create:
-					s.AddPath(event.Name)
-				case fswatcher.Remove:
-					s.RemoveFile(event.Name)
-				case fswatcher.Write:
-					s.UpdateFile(event.Name)
-				case fswatcher.Rename:
-					moves[event.Name] = event.NewPath
-				}
-			case <-s.Watcher.ScanComplete():
-				if len(moves) == 0 {
-					break
-				}
-				s.Sync(moves)
-				for from := range moves {
-					delete(moves, from)
-				}
-			case err := <-s.Watcher.Errors():
-				s.log.Error("%s", err)
-			}
-		}
-	}()
+func (s *ImageSync) processEvent(event fswatcher.Event, moves *map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch event.Op {
+	case fswatcher.Create:
+		s.AddPath(event.Name)
+	case fswatcher.Remove:
+		s.RemoveFile(event.Name)
+	case fswatcher.Write:
+		s.UpdateFile(event.Name)
+	case fswatcher.Rename:
+		(*moves)[event.Name] = event.NewPath
+	}
+}
 
+func (s *ImageSync) WatchEvents(onMoved func(moves *map[string]string)) {
+	moves := map[string]string{}
+	for {
+		select {
+		case event := <-s.Watcher.Events():
+			s.processEvent(event, &moves)
+		case <-s.Watcher.ScanComplete():
+			if len(moves) == 0 {
+				break
+			}
+			if onMoved != nil {
+				onMoved(&moves)
+				break
+			}
+			s.Sync(moves)
+			for from := range moves {
+				delete(moves, from)
+			}
+		case err := <-s.Watcher.Errors():
+			s.log.Error("%s", err)
+		}
+	}
+}
+
+func (s *ImageSync) StartFileWatcher(interval time.Duration) {
 	err := s.Watcher.Start(interval)
 	if err != nil {
 		s.log.Error("%s", err)
 	}
+}
+
+func (s *ImageSync) StopFileWatcher() {
+	s.Watcher.Stop()
+}
+
+func (s *ImageSync) Watch(interval time.Duration) {
+	go s.WatchEvents(nil)
+	go s.StartFileWatcher(interval)
 }
 
 func (s *ImageSync) Close() {

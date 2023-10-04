@@ -30,6 +30,11 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
+func watch(m model) tea.Cmd {
+	m.syncer.Watch(time.Millisecond * 500)
+	return nil
+}
+
 // Update is called when messages are received. The idea is that you inspect the
 // message and send back an updated model accordingly. You can also return
 // a command, which is a function that performs I/O and returns a message.
@@ -41,6 +46,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			m.syncer.Close()
 			return m, tea.Quit
+		case "w":
+			if m.watching {
+				m.syncer.StopFileWatcher()
+				m.watching = false
+				return m, nil
+			}
+			m.syncer.ProcessFiles()
+			m.watching = true
+			watch(m)
+			return m, nil
 		}
 	case watchMsg:
 		m.watching = true
@@ -66,13 +81,8 @@ func (m model) View() string {
 
 type watchMsg time.Duration
 
-func watch(m model) tea.Cmd {
-	go m.syncer.Watch(time.Millisecond * 500)
-	return nil
-}
-
 func NewProgram(root string, interval time.Duration) *tea.Program {
 	syncer := imagesync.New(os.DirFS(root), root)
 	watching := interval > 0
-	return tea.NewProgram(model{root: root, syncer: syncer, watching: watching, pollinterval: interval}, tea.WithAltScreen())
+	return tea.NewProgram(model{root: root, syncer: syncer, watching: watching, pollinterval: interval})
 }

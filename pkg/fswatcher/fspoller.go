@@ -16,13 +16,14 @@ type fsPoller struct {
 	// watched files and dirs
 	watches map[string]struct{}
 	// stores info about files and dirs inside watched paths
-	files      map[string]*fs.FileInfo
-	events     chan Event
-	errors     chan error
-	done       chan struct{}
-	scanDone   chan struct{}
-	shouldSkip func(fs.FileInfo) bool
-	fsys       fs.FS
+	files        map[string]*fs.FileInfo
+	events       chan Event
+	errors       chan error
+	done         chan struct{}
+	scanDone     chan struct{}
+	watchStopped chan struct{}
+	shouldSkip   func(fs.FileInfo) bool
+	fsys         fs.FS
 	// path to the root directory
 	root    string
 	running bool
@@ -231,7 +232,6 @@ func (p *fsPoller) WatchedList() map[string]*fs.FileInfo {
 	return files
 }
 
-// watch watches item for changes until done is closed.
 func (p *fsPoller) Start(interval time.Duration) error {
 	if interval < MIN_INTERVAL {
 		interval = MIN_INTERVAL
@@ -246,18 +246,38 @@ func (p *fsPoller) Start(interval time.Duration) error {
 	p.mu.Unlock()
 
 	for {
-		time.Sleep(interval)
-
-		if p.closed {
-			return nil
-		}
-
-		p.scanForChanges()
 		select {
-		case p.scanDone <- struct{}{}:
+		case <-p.watchStopped:
+			return nil
 		case <-p.done:
 			return nil
+		case <-time.After(interval):
+			p.Scan()
 		}
+	}
+}
+
+func (p *fsPoller) Stop() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.running {
+		return
+	}
+	p.running = false
+	p.watchStopped <- struct{}{}
+}
+
+// Scan scans watched directories for changes
+func (p *fsPoller) Scan() {
+	if p.closed {
+		return
+	}
+
+	p.scanForChanges()
+	select {
+	case p.scanDone <- struct{}{}:
+	case <-p.done:
+		return
 	}
 }
 

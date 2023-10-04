@@ -1,8 +1,8 @@
 package cmd
 
 import (
+	"fmt"
 	syncer "imagesync/cmd/syncher"
-	Logger "imagesync/pkg/log"
 	"os"
 	"time"
 
@@ -21,9 +21,8 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		root, err := os.Getwd()
-		log := Logger.New()
 		if err != nil {
-			log.Error("%s", err)
+			fmt.Printf("Error: %s", err)
 			os.Exit(1)
 		}
 		// isync := imagesync.New(os.DirFS(root), root)
@@ -32,7 +31,7 @@ to quickly create a Cobra application.`,
 
 		p := syncer.NewProgram(root, time.Millisecond*500)
 		if _, err := p.Run(); err != nil {
-			log.Error("%s", err)
+			fmt.Printf("Error: %s", err)
 		}
 	},
 }

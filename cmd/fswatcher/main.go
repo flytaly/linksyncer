@@ -44,7 +44,12 @@ func main() {
 		}
 	}()
 
-	go watcher.Start(time.Millisecond * 500)
+	go func() {
+		err := watcher.Start(time.Millisecond * 500)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 
 	go func() {
 		s := <-sign
