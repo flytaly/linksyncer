@@ -88,7 +88,8 @@ func GetImagesFromFile(filePath string, content string) []LinkInfo {
 		link, path := l[0], l[1]
 		if !filepath.IsAbs(l[1]) {
 			dir := filepath.Dir(filePath)
-			info := LinkInfo{fullLink: link, path: path, rootPath: filepath.Join(dir, path)}
+			// save as path with slash for consistency on Windows
+			info := LinkInfo{fullLink: link, path: path, rootPath: filepath.ToSlash(filepath.Join(dir, path))}
 			result = append(result, info)
 		} else {
 			result = append(result, LinkInfo{fullLink: link, path: path, rootPath: path})
