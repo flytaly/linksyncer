@@ -10,29 +10,55 @@ import (
 	"github.com/gookit/color"
 )
 
+type movesMsg map[string]string
+
 type model struct {
-	// choices  []string           // items on the to-do list
-	// cursor   int                // which to-do list item our cursor is pointing at
-	// selected map[int]struct{}   // which to-do items are selected
 	pollinterval time.Duration
 	syncer       *imagesync.ImageSync
 	root         string
 	quitting     bool
 	watching     bool
+	moves        chan movesMsg
+}
+
+func listenForMoves(m model) tea.Cmd {
+	return func() tea.Msg {
+		m.syncer.WatchEvents(func(moves map[string]string) {
+			movesCopy := make(map[string]string)
+			for k, v := range moves {
+				movesCopy[k] = v
+			}
+			m.moves <- movesMsg(movesCopy)
+		})
+		return nil
+	}
+}
+
+func waitForMoves(mv chan movesMsg) tea.Cmd {
+	return func() tea.Msg {
+		return movesMsg(<-mv)
+	}
 }
 
 // Init optionally returns an initial command we should run.
 func (m model) Init() tea.Cmd {
 	m.syncer.ProcessFiles()
-	if m.watching {
-		return watch(m)
+	cmds := []tea.Cmd{
+		listenForMoves(m),
+		waitForMoves(m.moves),
 	}
-	return nil
+	if m.watching {
+		cmds = append(cmds, watch(m))
+		return tea.Batch(cmds...)
+	}
+	return tea.Batch(cmds...)
 }
 
 func watch(m model) tea.Cmd {
-	m.syncer.Watch(time.Millisecond * 500)
-	return nil
+	return func() tea.Msg {
+		go m.syncer.StartFileWatcher(time.Millisecond * 500)
+		return nil
+	}
 }
 
 // Update is called when messages are received. The idea is that you inspect the
@@ -56,10 +82,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.watching = true
 			watch(m)
 			return m, nil
+		case "enter":
+			if m.watching {
+				return m, nil
+			}
+			m.syncer.Scan()
+			return m, nil
 		}
-	case watchMsg:
-		m.watching = true
-		return m, nil
+	case movesMsg:
+		if m.watching {
+			m.syncer.Sync(msg)
+		} else {
+			// TODO:
+			fmt.Println("TODO: should sync in manual mode")
+		}
+		return m, waitForMoves(m.moves)
 	}
 	return m, nil
 }
@@ -79,10 +116,13 @@ func (m model) View() string {
 	return result
 }
 
-type watchMsg time.Duration
-
 func NewProgram(root string, interval time.Duration) *tea.Program {
 	syncer := imagesync.New(os.DirFS(root), root)
 	watching := interval > 0
-	return tea.NewProgram(model{root: root, syncer: syncer, watching: watching, pollinterval: interval})
+	return tea.NewProgram(model{
+		root:         root,
+		syncer:       syncer,
+		watching:     watching,
+		pollinterval: interval,
+		moves:        make(chan movesMsg)})
 }

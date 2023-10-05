@@ -20,8 +20,9 @@ type ImageSync struct {
 
 	Watcher fswatcher.FsWatcher
 
-	log log.Logger
-	mu  *sync.Mutex
+	stopEvents chan struct{}
+	log        log.Logger
+	mu         *sync.Mutex
 }
 
 var parsableFiles = regexp.MustCompile("(?i)(" + ParsableFilesExtension + ")$")
@@ -51,6 +52,7 @@ func New(fileSystem fs.FS, root string, options ...func(*ImageSync)) *ImageSync 
 		Files:      map[string][]LinkInfo{},
 		Images:     map[string]map[string]struct{}{},
 		fileSystem: fileSystem,
+		stopEvents: make(chan struct{}),
 		mu:         new(sync.Mutex),
 		log:        log.New(),
 	}
@@ -303,7 +305,7 @@ func (s *ImageSync) processEvent(event fswatcher.Event, moves *map[string]string
 	}
 }
 
-func (s *ImageSync) WatchEvents(onMoved func(moves *map[string]string)) {
+func (s *ImageSync) WatchEvents(onMoves func(moves map[string]string)) {
 	moves := map[string]string{}
 	for {
 		select {
@@ -313,14 +315,16 @@ func (s *ImageSync) WatchEvents(onMoved func(moves *map[string]string)) {
 			if len(moves) == 0 {
 				break
 			}
-			if onMoved != nil {
-				onMoved(&moves)
-				break
+			var syncFn = s.Sync
+			if onMoves != nil {
+				syncFn = onMoves
 			}
-			s.Sync(moves)
+			syncFn(moves)
 			for from := range moves {
 				delete(moves, from)
 			}
+		case <-s.stopEvents:
+			return
 		case err := <-s.Watcher.Errors():
 			s.log.Error("%s", err)
 		}
@@ -334,8 +338,16 @@ func (s *ImageSync) StartFileWatcher(interval time.Duration) {
 	}
 }
 
+func (s *ImageSync) Scan() {
+	s.Watcher.Scan()
+}
+
 func (s *ImageSync) StopFileWatcher() {
 	s.Watcher.Stop()
+}
+
+func (s *ImageSync) StopEventListeners() {
+	s.stopEvents <- struct{}{}
 }
 
 func (s *ImageSync) Watch(interval time.Duration) {
