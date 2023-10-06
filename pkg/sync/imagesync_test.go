@@ -2,7 +2,6 @@ package imagesync
 
 import (
 	"imagesync/pkg/fswatcher"
-	"imagesync/pkg/log"
 	"io/fs"
 	"testing"
 	"testing/fstest"
@@ -12,9 +11,7 @@ import (
 )
 
 func NewTestISync(fs fs.FS, root string) *ImageSync {
-	return New(fs, root, func(is *ImageSync) {
-		is.log = log.NewEmptyLog()
-	})
+	return New(fs, root, nil)
 }
 
 func mockWriteFile(t *testing.T) (*map[string]string, func()) {

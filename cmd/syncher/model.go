@@ -2,6 +2,7 @@ package teaprogram
 
 import (
 	"fmt"
+	"imagesync/pkg/log"
 	imagesync "imagesync/pkg/sync"
 	"os"
 	"time"
@@ -117,7 +118,7 @@ func (m model) View() string {
 }
 
 func NewProgram(root string, interval time.Duration) *tea.Program {
-	syncer := imagesync.New(os.DirFS(root), root)
+	syncer := imagesync.New(os.DirFS(root), root, log.New("info.log"))
 	watching := interval > 0
 	return tea.NewProgram(model{
 		root:         root,

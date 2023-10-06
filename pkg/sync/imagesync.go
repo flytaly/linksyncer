@@ -1,6 +1,7 @@
 package imagesync
 
 import (
+	"fmt"
 	"imagesync/pkg/fswatcher"
 	"imagesync/pkg/log"
 	"io/fs"
@@ -43,9 +44,12 @@ func shouldSkipPath(fi fs.FileInfo) bool {
 }
 
 // Creates a new ImageSync
-func New(fileSystem fs.FS, root string, options ...func(*ImageSync)) *ImageSync {
+func New(fileSystem fs.FS, root string, logger log.Logger, options ...func(*ImageSync)) *ImageSync {
 	watcher := fswatcher.NewFsPoller(fileSystem, root)
 	watcher.AddShouldSkipHook(shouldSkipPath)
+	if logger == nil {
+		logger = log.NewEmptyLog()
+	}
 	iSync := &ImageSync{
 		root:       root,
 		Watcher:    watcher,
@@ -54,7 +58,7 @@ func New(fileSystem fs.FS, root string, options ...func(*ImageSync)) *ImageSync 
 		fileSystem: fileSystem,
 		stopEvents: make(chan struct{}),
 		mu:         new(sync.Mutex),
-		log:        log.New(),
+		log:        logger,
 	}
 
 	for _, option := range options {
@@ -193,7 +197,7 @@ func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
 		s.log.Error("Couldn't update links in %s. Error: %v\n", newPath, err)
 		return
 	}
-	s.log.Info("File moved: %s -> %s\n", oldPath, newPath)
+	s.log.Info("File moved: %s -> %s", oldPath, newPath)
 }
 
 // UpdateLinksInFile replaces links in the file
@@ -232,6 +236,7 @@ func (s *ImageSync) Sync(moves map[string]string) {
 		}
 		if s.Images[from] != nil { // if linked file was moved store it in the map
 			movedLinks[from] = to
+			s.log.Info("Linked file moved: %s -> %s", from, to)
 		}
 	}
 	// 2) Then synchronize rest of the files that depends on moved linked files
@@ -357,4 +362,8 @@ func (s *ImageSync) Watch(interval time.Duration) {
 
 func (s *ImageSync) Close() {
 	s.Watcher.Close()
+	err := s.log.Close()
+	if err != nil {
+		fmt.Println("Couldn't close log file")
+	}
 }
