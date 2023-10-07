@@ -132,10 +132,7 @@ func (m model) View() string {
 	case Watching:
 		result += fmt.Sprintf("\n%s Watch for changes", color.Green.Sprint("➜"))
 	case ShouldConfirm:
-		result += fmt.Sprintf("\nFound %d changes.", len(m.moves))
-		for from, to := range m.moves {
-			result += fmt.Sprintf("\n %s -> %s", color.Cyan.Sprint(from), color.Cyan.Sprint(to))
-		}
+		result += "\nMoves:\n" + printMoves(m.moves, 6, 70)
 		result += fmt.Sprintf("\n%s Press %s to update links or %s to skip", color.Green.Sprint("➜"), color.Green.Sprint("y"), color.Green.Sprint("n"))
 	case Waiting:
 		result += fmt.Sprintf("\n%s Press %s to check the path for changes", color.Green.Sprint("➜"), color.Green.Sprint("Enter"))
