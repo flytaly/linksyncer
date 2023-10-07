@@ -13,13 +13,22 @@ import (
 
 type movesMsg map[string]string
 
+type Status int
+
+const (
+	Watching Status = iota
+	Waiting
+	ShouldConfirm
+	Quitting
+)
+
 type model struct {
 	pollinterval time.Duration
 	syncer       *imagesync.ImageSync
 	root         string
-	quitting     bool
-	watching     bool
-	moves        chan movesMsg
+	status       Status
+	movesChan    chan movesMsg
+	moves        map[string]string
 }
 
 func listenForMoves(m model) tea.Cmd {
@@ -29,7 +38,7 @@ func listenForMoves(m model) tea.Cmd {
 			for k, v := range moves {
 				movesCopy[k] = v
 			}
-			m.moves <- movesMsg(movesCopy)
+			m.movesChan <- movesMsg(movesCopy)
 		})
 		return nil
 	}
@@ -46,9 +55,9 @@ func (m model) Init() tea.Cmd {
 	m.syncer.ProcessFiles()
 	cmds := []tea.Cmd{
 		listenForMoves(m),
-		waitForMoves(m.moves),
+		waitForMoves(m.movesChan),
 	}
-	if m.watching {
+	if m.status == Watching {
 		cmds = append(cmds, watch(m))
 		return tea.Batch(cmds...)
 	}
@@ -69,35 +78,48 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "esc", "ctrl+c":
-			m.quitting = true
+		case "q", "ctrl+c":
+			m.status = Quitting
 			m.syncer.Close()
 			return m, tea.Quit
 		case "w":
-			if m.watching {
+			if m.status == Watching {
 				m.syncer.StopFileWatcher()
-				m.watching = false
+				m.status = Waiting
 				return m, nil
 			}
 			m.syncer.ProcessFiles()
-			m.watching = true
+			m.status = Watching
 			watch(m)
 			return m, nil
-		case "enter":
-			if m.watching {
+		case "enter", "y":
+			if m.status == Watching {
 				return m, nil
+			}
+			if len(m.moves) != 0 {
+				m.syncer.Sync(m.moves)
+			}
+			m.status = Waiting
+			m.syncer.Scan()
+			return m, nil
+		case "esc", "n":
+			if m.status == ShouldConfirm {
+				m.status = Waiting
 			}
 			m.syncer.Scan()
 			return m, nil
 		}
 	case movesMsg:
-		if m.watching {
+		switch m.status {
+		case Watching:
 			m.syncer.Sync(msg)
-		} else {
-			// TODO:
-			fmt.Println("TODO: should sync in manual mode")
+		default:
+			if len(msg) != 0 {
+				m.status = ShouldConfirm
+				m.moves = msg
+			}
 		}
-		return m, waitForMoves(m.moves)
+		return m, waitForMoves(m.movesChan)
 	}
 	return m, nil
 }
@@ -105,25 +127,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View returns a string based on data in the model. That string which will be
 // rendered to the terminal.
 func (m model) View() string {
-	if m.quitting {
-		return ""
+	result := fmt.Sprintf("Path %s", color.Cyan.Sprint(m.root))
+	switch m.status {
+	case Watching:
+		result += fmt.Sprintf("\n%s Watch for changes", color.Green.Sprint("➜"))
+	case ShouldConfirm:
+		result += fmt.Sprintf("\nFound %d changes.", len(m.moves))
+		for from, to := range m.moves {
+			result += fmt.Sprintf("\n %s -> %s", color.Cyan.Sprint(from), color.Cyan.Sprint(to))
+		}
+		result += fmt.Sprintf("\n%s Press %s to update links or %s to skip", color.Green.Sprint("➜"), color.Green.Sprint("y"), color.Green.Sprint("n"))
+	case Waiting:
+		result += fmt.Sprintf("\n%s Press %s to check the path for changes", color.Green.Sprint("➜"), color.Green.Sprint("Enter"))
 	}
-	result := ""
-
-	if m.watching {
-		result = fmt.Sprintf(" %s  Watch path: %s", color.Green.Sprint("➜"), color.Cyan.Sprint(m.root))
-	}
-
 	return result
 }
 
 func NewProgram(root string, interval time.Duration) *tea.Program {
 	syncer := imagesync.New(os.DirFS(root), root, log.New("info.log"))
-	watching := interval > 0
+	status := Waiting
+	if interval > 0 {
+		status = Watching
+	}
 	return tea.NewProgram(model{
 		root:         root,
 		syncer:       syncer,
-		watching:     watching,
 		pollinterval: interval,
-		moves:        make(chan movesMsg)})
+		status:       status,
+		movesChan:    make(chan movesMsg)})
 }
