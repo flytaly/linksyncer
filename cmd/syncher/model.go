@@ -7,7 +7,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/gookit/color"
 )
 
@@ -29,6 +31,8 @@ type model struct {
 	status       Status
 	movesChan    chan movesMsg
 	moves        map[string]string
+
+	spinner spinner.Model
 }
 
 func listenForMoves(m model) tea.Cmd {
@@ -53,12 +57,13 @@ func waitForMoves(mv chan movesMsg) tea.Cmd {
 // Init optionally returns an initial command we should run.
 func (m model) Init() tea.Cmd {
 	m.syncer.ProcessFiles()
+
 	cmds := []tea.Cmd{
 		listenForMoves(m),
 		waitForMoves(m.movesChan),
 	}
 	if m.status == Watching {
-		cmds = append(cmds, watch(m))
+		cmds = append(cmds, watch(m), m.spinner.Tick)
 		return tea.Batch(cmds...)
 	}
 	return tea.Batch(cmds...)
@@ -91,7 +96,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncer.ProcessFiles()
 			m.status = Watching
 			watch(m)
-			return m, nil
+			return m, m.spinner.Tick
 		case "enter", "y":
 			if m.status == Watching {
 				return m, nil
@@ -120,6 +125,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, waitForMoves(m.movesChan)
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -130,7 +139,7 @@ func (m model) View() string {
 	result := fmt.Sprintf("Path %s", color.Cyan.Sprint(m.root))
 	switch m.status {
 	case Watching:
-		result += fmt.Sprintf("\n%s Watch for changes", color.Green.Sprint("➜"))
+		result += fmt.Sprintf("\n%s Watch for changes", m.spinner.View())
 	case ShouldConfirm:
 		result += "\nMoves:\n" + printMoves(m.moves, 6, 70)
 		result += fmt.Sprintf("\n%s Press %s to update links or %s to skip", color.Green.Sprint("➜"), color.Green.Sprint("y"), color.Green.Sprint("n"))
@@ -146,10 +155,16 @@ func NewProgram(root string, interval time.Duration) *tea.Program {
 	if interval > 0 {
 		status = Watching
 	}
+	sp := spinner.New()
+	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	sp.Spinner = spinner.Line
+
 	return tea.NewProgram(model{
 		root:         root,
 		syncer:       syncer,
 		pollinterval: interval,
 		status:       status,
-		movesChan:    make(chan movesMsg)})
+		movesChan:    make(chan movesMsg),
+		spinner:      sp,
+	})
 }
