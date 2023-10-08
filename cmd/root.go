@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+	syncer "imagesync/cmd/syncher"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -19,6 +21,15 @@ to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
+		root, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("Error: %s", err)
+			os.Exit(1)
+		}
+		p := syncer.NewProgram(root, 0)
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error: %s", err)
+		}
 
 	},
 }

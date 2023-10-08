@@ -25,10 +25,6 @@ to quickly create a Cobra application.`,
 			fmt.Printf("Error: %s", err)
 			os.Exit(1)
 		}
-		// isync := imagesync.New(os.DirFS(root), root)
-		// isync.ProcessFiles()
-		// isync.Watch(time.Millisecond * 500)
-
 		p := syncer.NewProgram(root, time.Millisecond*500)
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error: %s", err)

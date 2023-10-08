@@ -13,8 +13,6 @@ import (
 	"github.com/gookit/color"
 )
 
-type movesMsg map[string]string
-
 type Status int
 
 const (
@@ -33,25 +31,8 @@ type model struct {
 	moves        map[string]string
 
 	spinner spinner.Model
-}
-
-func listenForMoves(m model) tea.Cmd {
-	return func() tea.Msg {
-		m.syncer.WatchEvents(func(moves map[string]string) {
-			movesCopy := make(map[string]string)
-			for k, v := range moves {
-				movesCopy[k] = v
-			}
-			m.movesChan <- movesMsg(movesCopy)
-		})
-		return nil
-	}
-}
-
-func waitForMoves(mv chan movesMsg) tea.Cmd {
-	return func() tea.Msg {
-		return movesMsg(<-mv)
-	}
+	logCh   chan string
+	logs    []string
 }
 
 // Init optionally returns an initial command we should run.
@@ -61,6 +42,7 @@ func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		listenForMoves(m),
 		waitForMoves(m.movesChan),
+		waitForLogs(m.logCh),
 	}
 	if m.status == Watching {
 		cmds = append(cmds, watch(m), m.spinner.Tick)
@@ -125,7 +107,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, waitForMoves(m.movesChan)
+	case logMsg:
+		if len(m.logs) > 20 {
+			m.logs = m.logs[1:]
+		}
+		m.logs = append(m.logs, string(msg))
+		return m, waitForLogs(m.logCh)
 	case spinner.TickMsg:
+		if m.status != Watching {
+			return m, nil
+		}
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
@@ -141,23 +132,30 @@ func (m model) View() string {
 	case Watching:
 		result += fmt.Sprintf("\n%s Watch for changes", m.spinner.View())
 	case ShouldConfirm:
-		result += "\nMoves:\n" + printMoves(m.moves, 6, 70)
+		result += "\nMoves:\n" + printMoves(m.moves, 6, 80)
 		result += fmt.Sprintf("\n%s Press %s to update links or %s to skip", color.Green.Sprint("➜"), color.Green.Sprint("y"), color.Green.Sprint("n"))
 	case Waiting:
 		result += fmt.Sprintf("\n%s Press %s to check the path for changes", color.Green.Sprint("➜"), color.Green.Sprint("Enter"))
+	}
+	if len(m.logs) > 0 {
+		result += "\n\nLogs:\n" // + strings.Join(m.logs[max(len(m.logs)-6, 0):], "\n")
+		offset := max(len(m.logs)-6, 0)
+		for i := len(m.logs) - 1; i >= offset; i-- {
+			result += fmt.Sprintf("%s\n", m.logs[i])
+		}
+		// result += "\n\nLogs:\n" + strings.Join(m.logs[max(len(m.logs)-6, 0):], "\n")
 	}
 	return result
 }
 
 func NewProgram(root string, interval time.Duration) *tea.Program {
-	syncer := imagesync.New(os.DirFS(root), root, log.New("info.log"))
+	logChannel := make(chan string, 10)
+	syncer := imagesync.New(os.DirFS(root), root, log.New("info.log", logChannel))
+
 	status := Waiting
 	if interval > 0 {
 		status = Watching
 	}
-	sp := spinner.New()
-	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	sp.Spinner = spinner.Line
 
 	return tea.NewProgram(model{
 		root:         root,
@@ -165,6 +163,15 @@ func NewProgram(root string, interval time.Duration) *tea.Program {
 		pollinterval: interval,
 		status:       status,
 		movesChan:    make(chan movesMsg),
-		spinner:      sp,
-	})
+		spinner:      newSpinner(),
+		logCh:        logChannel,
+		logs:         []string{},
+	}, tea.WithAltScreen())
+}
+
+func newSpinner() spinner.Model {
+	s := spinner.New()
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	s.Spinner = spinner.Line
+	return s
 }
