@@ -77,8 +77,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.syncer.ProcessFiles()
 			m.status = Watching
-			watch(m)
-			return m, m.spinner.Tick
+			return m, tea.Batch(watch(m), m.spinner.Tick)
 		case "enter", "y":
 			if m.status == Watching {
 				return m, nil
