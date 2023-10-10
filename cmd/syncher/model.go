@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -23,6 +25,8 @@ const (
 )
 
 type model struct {
+	keys         keyMap
+	help         help.Model
 	pollinterval time.Duration
 	syncer       *imagesync.ImageSync
 	root         string
@@ -64,12 +68,12 @@ func watch(m model) tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
+		switch {
+		case key.Matches(msg, m.keys.Quit):
 			m.status = Quitting
 			m.syncer.Close()
 			return m, tea.Quit
-		case "w":
+		case key.Matches(msg, m.keys.Watch):
 			if m.status == Watching {
 				m.syncer.StopFileWatcher()
 				m.status = Waiting
@@ -78,7 +82,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.syncer.ProcessFiles()
 			m.status = Watching
 			return m, tea.Batch(watch(m), m.spinner.Tick)
-		case "enter", "y":
+		case key.Matches(msg, m.keys.Confirm):
 			if m.status == Watching {
 				return m, nil
 			}
@@ -88,13 +92,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = Waiting
 			m.syncer.Scan()
 			return m, nil
-		case "esc", "n":
+		case key.Matches(msg, m.keys.Cancel):
 			if m.status == ShouldConfirm {
 				m.status = Waiting
 			}
 			m.syncer.Scan()
 			return m, nil
 		}
+	case tea.WindowSizeMsg:
+		// If we set a width on the help menu it can gracefully truncate
+		// its view as needed.
+		m.help.Width = msg.Width
 	case movesMsg:
 		switch m.status {
 		case Watching:
@@ -132,17 +140,21 @@ func (m model) View() string {
 		result += fmt.Sprintf("\n%s Watch for changes", m.spinner.View())
 	case ShouldConfirm:
 		result += "\nMoves:\n" + printMoves(m.moves, 6, 80)
-		result += fmt.Sprintf("\n%s Press %s to update links or %s to skip", color.Green.Sprint("➜"), color.Green.Sprint("y"), color.Green.Sprint("n"))
+		result += fmt.Sprintf("\n%s Press '%s' to update links or %s to skip", color.Green.Sprint("➜"), color.Green.Sprint("y"), color.Green.Sprint("n"))
 	case Waiting:
-		result += fmt.Sprintf("\n%s Press %s to check the path for changes", color.Green.Sprint("➜"), color.Green.Sprint("Enter"))
+		result += fmt.Sprintf("\n%s Press '%s' to check the path for changes", color.Green.Sprint("➜"), color.Green.Sprint("Enter"))
 	}
+
+	helpView := m.help.View(m.keys)
+
+	result += "\n\n" + helpView
+
 	if len(m.logs) > 0 {
-		result += "\n\nLogs:\n" // + strings.Join(m.logs[max(len(m.logs)-6, 0):], "\n")
+		result += "\n\nLogs:\n"
 		offset := max(len(m.logs)-6, 0)
 		for i := len(m.logs) - 1; i >= offset; i-- {
 			result += fmt.Sprintf("%s\n", m.logs[i])
 		}
-		// result += "\n\nLogs:\n" + strings.Join(m.logs[max(len(m.logs)-6, 0):], "\n")
 	}
 	return result
 }
@@ -156,7 +168,11 @@ func NewProgram(root string, interval time.Duration) *tea.Program {
 		status = Watching
 	}
 
+	helpModel := help.New()
+
 	return tea.NewProgram(model{
+		keys:         keys,
+		help:         helpModel,
 		root:         root,
 		syncer:       syncer,
 		pollinterval: interval,
@@ -165,7 +181,7 @@ func NewProgram(root string, interval time.Duration) *tea.Program {
 		spinner:      newSpinner(),
 		logCh:        logChannel,
 		logs:         []string{},
-	}, tea.WithAltScreen())
+	}) //, tea.WithAltScreen())
 }
 
 func newSpinner() spinner.Model {
