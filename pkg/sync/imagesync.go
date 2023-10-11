@@ -158,7 +158,7 @@ func (s *ImageSync) UpdateFile(relativePath string) {
 			s.clearLinkReferences(relativePath, li.rootPath)
 		}
 		s.AddFile(relativePath)
-		s.log.Info("Updated file: %s", relativePath)
+		s.log.Info("File updated: %s", relativePath)
 		return
 	}
 	s.AddPath(relativePath)
@@ -192,12 +192,12 @@ func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
 		movedLinks = append(movedLinks, ml)
 		s.clearLinkReferences(oldPath, link.rootPath)
 	}
+	s.log.Info("File moved: %s -> %s", oldPath, newPath)
 	err := s.UpdateLinksInFile(newPath, movedLinks)
 	if err != nil {
 		s.log.Error("Couldn't update links in %s. Error: %v\n", newPath, err)
 		return
 	}
-	s.log.Info("File moved: %s -> %s", oldPath, newPath)
 }
 
 // UpdateLinksInFile replaces links in the file
@@ -219,6 +219,7 @@ func (s *ImageSync) UpdateLinksInFile(relativePath string, links []MovedLink) er
 		s.clearLinkReferences(relativePath, link.link.rootPath)
 	}
 	s.saveLinks(relativePath, &images)
+	s.log.Info("Links updated: %s", relativePath)
 
 	return nil
 }

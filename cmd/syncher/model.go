@@ -5,6 +5,7 @@ import (
 	"imagesync/pkg/log"
 	imagesync "imagesync/pkg/sync"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -24,6 +25,16 @@ const (
 	Quitting
 )
 
+var (
+	logRowsNum    = 6
+	logWidth      = 40
+	spinnerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	dotStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Margin(0, 0, 0, 0)
+	logTitleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Bold(true).Width(logWidth).Align(lipgloss.Center).Margin(0, 0, 0, 0)
+	logTextStyle  = dotStyle.Copy()
+	appStyle      = lipgloss.NewStyle().Margin(1, 1, 0, 1)
+)
+
 type model struct {
 	keys         keyMap
 	help         help.Model
@@ -35,8 +46,10 @@ type model struct {
 	moves        map[string]string
 
 	spinner spinner.Model
+
 	logCh   chan string
 	logs    []string
+	showLog bool
 }
 
 // Init optionally returns an initial command we should run.
@@ -98,6 +111,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.syncer.Scan()
 			return m, nil
+		case key.Matches(msg, m.keys.Log):
+			m.showLog = !m.showLog
+			return m, nil
 		}
 	case tea.WindowSizeMsg:
 		// If we set a width on the help menu it can gracefully truncate
@@ -149,12 +165,21 @@ func (m model) View() string {
 
 	result += "\n\n" + helpView
 
-	if len(m.logs) > 0 {
-		result += "\n\nLogs:\n"
-		offset := max(len(m.logs)-6, 0)
-		for i := len(m.logs) - 1; i >= offset; i-- {
-			result += fmt.Sprintf("%s\n", m.logs[i])
-		}
+	if m.showLog {
+		result += "\n\n" + m.renderLog()
+	}
+
+	return appStyle.Render(result)
+}
+
+func (m model) renderLog() string {
+	result := logTitleStyle.Render("Log") + "\n"
+	offset := max(len(m.logs)-logRowsNum, 0)
+	for i := len(m.logs) - 1; i >= offset; i-- {
+		result += fmt.Sprintf("%s\n", logTextStyle.Render(m.logs[i]))
+	}
+	for i := 0; i < logRowsNum-offset; i++ {
+		result += fmt.Sprintf("%s\n", dotStyle.Render(strings.Repeat(".", logWidth)))
 	}
 	return result
 }
@@ -181,12 +206,13 @@ func NewProgram(root string, interval time.Duration) *tea.Program {
 		spinner:      newSpinner(),
 		logCh:        logChannel,
 		logs:         []string{},
+		showLog:      true,
 	}) //, tea.WithAltScreen())
 }
 
 func newSpinner() spinner.Model {
 	s := spinner.New()
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	s.Spinner = spinner.Line
+	s.Style = spinnerStyle
 	return s
 }
