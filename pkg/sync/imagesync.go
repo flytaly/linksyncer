@@ -195,7 +195,7 @@ func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
 	s.log.Info("File moved: %s -> %s", oldPath, newPath)
 	err := s.UpdateLinksInFile(newPath, movedLinks)
 	if err != nil {
-		s.log.Error("Couldn't update links in %s. Error: %v\n", newPath, err)
+		s.log.Error("Couldn't update links in %s. Error: %v", newPath, err)
 		return
 	}
 }
@@ -245,7 +245,7 @@ func (s *ImageSync) Sync(moves map[string]string) {
 	for sourceFile, links := range fileMap {
 		err := s.UpdateLinksInFile(sourceFile, links)
 		if err != nil {
-			s.log.Error("Couldn't update links in %s. Error: %v\n", sourceFile, err)
+			s.log.Error("Couldn't update links in %s. Error: %v", sourceFile, err)
 		}
 	}
 }

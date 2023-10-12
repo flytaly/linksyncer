@@ -1,6 +1,10 @@
 package teaprogram
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"imagesync/pkg/log"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 type movesMsg map[string]string
 
@@ -23,10 +27,8 @@ func waitForMoves(mv chan movesMsg) tea.Cmd {
 	}
 }
 
-type logMsg string
-
-func waitForLogs(logChan chan string) tea.Cmd {
+func waitForLogs(logChan chan log.Record) tea.Cmd {
 	return func() tea.Msg {
-		return logMsg(<-logChan)
+		return log.Record(<-logChan)
 	}
 }

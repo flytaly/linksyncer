@@ -4,7 +4,22 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 )
+
+type Level int
+
+const (
+	Info Level = iota
+	Warning
+	Error
+)
+
+type Record struct {
+	Level Level
+	Ts    time.Time
+	Msg   string
+}
 
 type Logger interface {
 	Error(format string, v ...any)
@@ -13,7 +28,7 @@ type Logger interface {
 	Close() error
 }
 
-func New(path string, channel chan string) Logger {
+func New(path string, channel chan Record) Logger {
 	if path != "" {
 		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
@@ -28,9 +43,9 @@ func New(path string, channel chan string) Logger {
 		}
 	}
 	return &StdLog{
-		err:     log.New(os.Stderr, "", 0),
-		wrn:     log.New(os.Stderr, "", 0),
-		inf:     log.New(os.Stdout, "", 0),
+		// err:     log.New(os.Stderr, "", 0),
+		// wrn:     log.New(os.Stderr, "", 0),
+		// inf:     log.New(os.Stdout, "", 0),
 		channel: channel,
 	}
 }
@@ -38,25 +53,31 @@ func New(path string, channel chan string) Logger {
 type StdLog struct {
 	err, wrn, inf *log.Logger
 	file          *os.File
-	channel       chan string
+	channel       chan Record
 }
 
 func (l *StdLog) Error(format string, v ...any) {
 	msg := fmt.Sprintf(format, v...)
-	_ = l.err.Output(2, fmt.Sprintf(format, v...))
-	l.Send(msg)
+	l.Send(Record{Error, time.Now(), msg})
+	if l.err != nil {
+		_ = l.err.Output(2, fmt.Sprintf(format, v...))
+	}
 }
 
 func (l *StdLog) Info(format string, v ...any) {
 	msg := fmt.Sprintf(format, v...)
-	_ = l.inf.Output(2, msg)
-	l.Send(msg)
+	l.Send(Record{Info, time.Now(), msg})
+	if l.inf != nil {
+		_ = l.inf.Output(2, msg)
+	}
 }
 
 func (l *StdLog) Warning(format string, v ...any) {
 	msg := fmt.Sprintf(format, v...)
-	_ = l.wrn.Output(2, msg)
-	l.Send(msg)
+	l.Send(Record{Warning, time.Now(), msg})
+	if l.wrn != nil {
+		_ = l.wrn.Output(2, msg)
+	}
 }
 
 func (l *StdLog) Close() error {
@@ -66,10 +87,10 @@ func (l *StdLog) Close() error {
 	return nil
 }
 
-func (l *StdLog) Send(msg string) {
+func (l *StdLog) Send(entry Record) {
 	if l.channel != nil {
 		go func() {
-			l.channel <- msg
+			l.channel <- entry
 		}()
 	}
 }

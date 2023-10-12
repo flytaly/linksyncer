@@ -26,12 +26,14 @@ const (
 )
 
 var (
-	logRowsNum    = 6
+	logRosShow    = 6
+	logRowsTotal  = 30
 	logWidth      = 40
 	spinnerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	dotStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Margin(0, 0, 0, 0)
 	logTitleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Bold(true).Width(logWidth).Align(lipgloss.Center).Margin(0, 0, 0, 0)
-	logTextStyle  = dotStyle.Copy()
+	logTextStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	logErrorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
 	appStyle      = lipgloss.NewStyle().Margin(1, 1, 0, 1)
 )
 
@@ -47,8 +49,8 @@ type model struct {
 
 	spinner spinner.Model
 
-	logCh   chan string
-	logs    []string
+	logCh   chan log.Record
+	logs    []log.Record
 	showLog bool
 }
 
@@ -130,11 +132,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, waitForMoves(m.movesChan)
-	case logMsg:
-		if len(m.logs) > 20 {
+	case log.Record:
+		if len(m.logs) >= logRowsTotal {
 			m.logs = m.logs[1:]
 		}
-		m.logs = append(m.logs, string(msg))
+		m.logs = append(m.logs, msg)
 		return m, waitForLogs(m.logCh)
 	case spinner.TickMsg:
 		if m.status != Watching {
@@ -174,18 +176,27 @@ func (m model) View() string {
 
 func (m model) renderLog() string {
 	result := logTitleStyle.Render("Log") + "\n"
-	offset := max(len(m.logs)-logRowsNum, 0)
+	offset := max(len(m.logs)-logRosShow, 0)
 	for i := len(m.logs) - 1; i >= offset; i-- {
-		result += fmt.Sprintf("%s\n", logTextStyle.Render(m.logs[i]))
+		r := fmt.Sprintf("[%s] %s", m.logs[i].Ts.Format("15:04:05"), m.logs[i].Msg)
+		switch m.logs[i].Level {
+		case log.Info:
+			result += logTextStyle.Render("✓ " + r)
+		case log.Error:
+			result += logErrorStyle.Render("✕ " + r)
+		case log.Warning:
+			result += logTextStyle.Render("⚠ " + r)
+		}
+		result += "\n"
 	}
-	for i := 0; i < logRowsNum-offset; i++ {
+	for i := 0; i < logRosShow-offset; i++ {
 		result += fmt.Sprintf("%s\n", dotStyle.Render(strings.Repeat(".", logWidth)))
 	}
 	return result
 }
 
 func NewProgram(root string, interval time.Duration) *tea.Program {
-	logChannel := make(chan string, 10)
+	logChannel := make(chan log.Record, logRowsTotal)
 	syncer := imagesync.New(os.DirFS(root), root, log.New("info.log", logChannel))
 
 	status := Waiting
@@ -205,7 +216,7 @@ func NewProgram(root string, interval time.Duration) *tea.Program {
 		movesChan:    make(chan movesMsg),
 		spinner:      newSpinner(),
 		logCh:        logChannel,
-		logs:         []string{},
+		logs:         []log.Record{},
 		showLog:      true,
 	}) //, tea.WithAltScreen())
 }
