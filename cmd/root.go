@@ -8,6 +8,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func getConfig(cmd *cobra.Command) syncer.ProgramCfg {
+	logPath, _ := cmd.Flags().GetString("log")
+	interval, _ := cmd.Flags().GetDuration("interval")
+	root, _ := cmd.Flags().GetString("path")
+	if root == "" {
+		var err error
+		root, err = os.Getwd()
+		if err != nil {
+			fmt.Printf("Error: %s", err)
+			os.Exit(1)
+		}
+	}
+	return syncer.ProgramCfg{
+		Interval: interval,
+		LogPath:  logPath,
+		Root:     root,
+	}
+}
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "imagesync",
@@ -21,12 +40,8 @@ to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
-		root, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Error: %s", err)
-			os.Exit(1)
-		}
-		p := syncer.NewProgram(root, 0)
+		cfg := getConfig(cmd)
+		p := syncer.NewProgram(cfg)
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error: %s", err)
 		}
@@ -49,8 +64,10 @@ func init() {
 	// will be global for your application.
 
 	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.imagesync.yaml)")
+	rootCmd.PersistentFlags().StringP("path", "p", "", "path to the watched directory (default is the working directory)")
+	rootCmd.PersistentFlags().StringP("log", "l", "", "path to the log file")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

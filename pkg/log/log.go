@@ -32,7 +32,8 @@ func New(path string, channel chan Record) Logger {
 	if path != "" {
 		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Unable to open log file. %s", err)
+			return nil
 		}
 		return &StdLog{
 			err:     log.New(file, "ERROR ", log.Ldate|log.Ltime),

@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	syncer "imagesync/cmd/syncher"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -20,12 +19,8 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		root, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Error: %s", err)
-			os.Exit(1)
-		}
-		p := syncer.NewProgram(root, time.Millisecond*500)
+		cfg := getConfig(cmd)
+		p := syncer.NewProgram(cfg)
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error: %s", err)
 		}
@@ -43,5 +38,5 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// watchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	watchCmd.Flags().DurationP("interval", "i", 500*time.Millisecond, "poll interval duration (e.g. 1s, 500ms...)")
 }

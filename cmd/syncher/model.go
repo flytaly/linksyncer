@@ -195,12 +195,18 @@ func (m model) renderLog() string {
 	return result
 }
 
-func NewProgram(root string, interval time.Duration) *tea.Program {
+type ProgramCfg struct {
+	Interval time.Duration
+	LogPath  string
+	Root     string
+}
+
+func NewProgram(cfg ProgramCfg) *tea.Program {
 	logChannel := make(chan log.Record, logRowsTotal)
-	syncer := imagesync.New(os.DirFS(root), root, log.New("info.log", logChannel))
+	syncer := imagesync.New(os.DirFS(cfg.Root), cfg.Root, log.New(cfg.LogPath, logChannel))
 
 	status := Waiting
-	if interval > 0 {
+	if cfg.Interval > 0 {
 		status = Watching
 	}
 
@@ -209,9 +215,9 @@ func NewProgram(root string, interval time.Duration) *tea.Program {
 	return tea.NewProgram(model{
 		keys:         keys,
 		help:         helpModel,
-		root:         root,
+		root:         cfg.Root,
 		syncer:       syncer,
-		pollinterval: interval,
+		pollinterval: cfg.Interval,
 		status:       status,
 		movesChan:    make(chan movesMsg),
 		spinner:      newSpinner(),
