@@ -196,14 +196,22 @@ func (m model) renderLog() string {
 }
 
 type ProgramCfg struct {
-	Interval time.Duration
-	LogPath  string
-	Root     string
+	Interval    time.Duration
+	LogPath     string
+	Root        string
+	MaxFileSize int64
 }
 
 func NewProgram(cfg ProgramCfg) *tea.Program {
 	logChannel := make(chan log.Record, logRowsTotal)
-	syncer := imagesync.New(os.DirFS(cfg.Root), cfg.Root, log.New(cfg.LogPath, logChannel))
+	syncer := imagesync.New(
+		os.DirFS(cfg.Root), cfg.Root, log.New(cfg.LogPath, logChannel),
+		func(s *imagesync.ImageSync) {
+			if cfg.MaxFileSize > 0 {
+				s.MaxFileSize = cfg.MaxFileSize
+			}
+		},
+	)
 
 	status := Waiting
 	if cfg.Interval > 0 {

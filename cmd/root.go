@@ -12,6 +12,7 @@ func getConfig(cmd *cobra.Command) syncer.ProgramCfg {
 	logPath, _ := cmd.Flags().GetString("log")
 	interval, _ := cmd.Flags().GetDuration("interval")
 	root, _ := cmd.Flags().GetString("path")
+	maxSizeInKb, _ := cmd.Flags().GetInt64("size")
 	if root == "" {
 		var err error
 		root, err = os.Getwd()
@@ -21,9 +22,10 @@ func getConfig(cmd *cobra.Command) syncer.ProgramCfg {
 		}
 	}
 	return syncer.ProgramCfg{
-		Interval: interval,
-		LogPath:  logPath,
-		Root:     root,
+		Interval:    interval,
+		LogPath:     logPath,
+		Root:        root,
+		MaxFileSize: maxSizeInKb * 1024,
 	}
 }
 
@@ -66,6 +68,7 @@ func init() {
 	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.imagesync.yaml)")
 	rootCmd.PersistentFlags().StringP("path", "p", "", "path to the watched directory (default is the working directory)")
 	rootCmd.PersistentFlags().StringP("log", "l", "", "path to the log file")
+	rootCmd.PersistentFlags().Int64("size", 1024, "maximum file size in KB")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

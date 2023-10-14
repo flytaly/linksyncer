@@ -18,7 +18,7 @@ type ImageSync struct {
 	root        string                         // path to the root directory
 	Files       map[string][]LinkInfo          // watching files
 	Images      map[string]map[string]struct{} // map images' paths to their text files
-	maxFileSize int64                          // max file size in bytes for parsable files
+	MaxFileSize int64                          // max file size in bytes for parsable files
 
 	Watcher fswatcher.FsWatcher
 
@@ -45,7 +45,7 @@ func getShouldSkipPath(iSync *ImageSync) func(fs.FileInfo) bool {
 		}
 
 		if parsableFiles.MatchString(name) {
-			return fi.Size() > iSync.maxFileSize
+			return fi.Size() > iSync.MaxFileSize
 		}
 
 		return !imageFiles.MatchString(name)
@@ -67,7 +67,7 @@ func New(fileSystem fs.FS, root string, logger log.Logger, options ...func(*Imag
 		stopEvents:  make(chan struct{}),
 		mu:          new(sync.Mutex),
 		log:         logger,
-		maxFileSize: MaxFileSize,
+		MaxFileSize: MaxFileSize,
 	}
 
 	for _, option := range options {

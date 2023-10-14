@@ -366,7 +366,7 @@ func TestSkipFiles(t *testing.T) {
 
 	t.Run("skip files by size", func(t *testing.T) {
 		iSync := New(fs, ".", nil, func(s *ImageSync) {
-			s.maxFileSize = 2 * 1024
+			s.MaxFileSize = 2 * 1024
 		})
 		shouldSkipFn := getShouldSkipPath(iSync)
 		isSkipped := func(name string) bool {
@@ -384,7 +384,7 @@ func TestSkipFiles(t *testing.T) {
 
 	t.Run("skip function should be passed to watcher", func(t *testing.T) {
 		iSync := New(fs, ".", nil, func(s *ImageSync) {
-			s.maxFileSize = 2 * 1024
+			s.MaxFileSize = 2 * 1024
 		})
 		iSync.ProcessFiles()
 		assert.Contains(t, iSync.Files, "small_note.md", "should not skip small files")
