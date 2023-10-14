@@ -14,10 +14,11 @@ import (
 )
 
 type ImageSync struct {
-	fileSystem fs.FS
-	root       string                         // path to the root directory
-	Files      map[string][]LinkInfo          // watching files
-	Images     map[string]map[string]struct{} // map images' paths to their text files
+	fileSystem  fs.FS
+	root        string                         // path to the root directory
+	Files       map[string][]LinkInfo          // watching files
+	Images      map[string]map[string]struct{} // map images' paths to their text files
+	maxFileSize int64                          // max file size in bytes for parsable files
 
 	Watcher fswatcher.FsWatcher
 
@@ -26,44 +27,54 @@ type ImageSync struct {
 	mu         *sync.Mutex
 }
 
+// var watchedExt = regexp.MustCompile("(?i)(" + ImgExtensions + "|" + ParsableFilesExtension + ")$")
 var parsableFiles = regexp.MustCompile("(?i)(" + ParsableFilesExtension + ")$")
+var imageFiles = regexp.MustCompile("(?i)(" + ImgExtensions + ")$")
 
-var watchedExt = regexp.MustCompile("(?i)(" + ImgExtensions + "|" + ParsableFilesExtension + ")$")
+const MaxFileSize int64 = 1024 * 1024
 
-func shouldSkipPath(fi fs.FileInfo) bool {
-	name := fi.Name()
-	if fi.IsDir() {
-		if name == "." { // don't skip root folder
-			return false
+func getShouldSkipPath(iSync *ImageSync) func(fs.FileInfo) bool {
+	return func(fi fs.FileInfo) bool {
+		name := fi.Name()
+		if fi.IsDir() {
+			if name == "." { // don't skip root folder
+				return false
+			}
+			// TODO: should be optional
+			return strings.HasPrefix(name, ".") || ExcludedDirs[name]
 		}
-		// TODO: should be optional
-		return strings.HasPrefix(name, ".") || ExcludedDirs[name]
-	}
 
-	return !watchedExt.MatchString(name)
+		if parsableFiles.MatchString(name) {
+			return fi.Size() > iSync.maxFileSize
+		}
+
+		return !imageFiles.MatchString(name)
+	}
 }
 
 // Creates a new ImageSync
 func New(fileSystem fs.FS, root string, logger log.Logger, options ...func(*ImageSync)) *ImageSync {
 	watcher := fswatcher.NewFsPoller(fileSystem, root)
-	watcher.AddShouldSkipHook(shouldSkipPath)
 	if logger == nil {
 		logger = log.NewEmptyLog()
 	}
 	iSync := &ImageSync{
-		root:       root,
-		Watcher:    watcher,
-		Files:      map[string][]LinkInfo{},
-		Images:     map[string]map[string]struct{}{},
-		fileSystem: fileSystem,
-		stopEvents: make(chan struct{}),
-		mu:         new(sync.Mutex),
-		log:        logger,
+		root:        root,
+		Watcher:     watcher,
+		Files:       map[string][]LinkInfo{},
+		Images:      map[string]map[string]struct{}{},
+		fileSystem:  fileSystem,
+		stopEvents:  make(chan struct{}),
+		mu:          new(sync.Mutex),
+		log:         logger,
+		maxFileSize: MaxFileSize,
 	}
 
 	for _, option := range options {
 		option(iSync)
 	}
+
+	watcher.AddShouldSkipHook(getShouldSkipPath(iSync))
 
 	return iSync
 }

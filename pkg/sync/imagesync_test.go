@@ -347,3 +347,49 @@ func TestWatch(t *testing.T) {
 		assert.Equal(t, expected, *gotData)
 	})
 }
+
+func generateBytes(n int) []byte {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = 'a'
+	}
+	return b
+}
+
+func TestSkipFiles(t *testing.T) {
+	var fs = fstest.MapFS{
+		"small_note.md": {Data: generateBytes(1 * 1024)},
+		"big_note.md":   {Data: generateBytes(10 * 1024)},
+		"note.md":       {Data: []byte("![](image.png)")},
+		"image.png":     {Data: generateBytes(10 * 1024)},
+	}
+
+	t.Run("skip files by size", func(t *testing.T) {
+		iSync := New(fs, ".", nil, func(s *ImageSync) {
+			s.maxFileSize = 2 * 1024
+		})
+		shouldSkipFn := getShouldSkipPath(iSync)
+		isSkipped := func(name string) bool {
+			info, err := fs.Stat(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return shouldSkipFn(info)
+		}
+
+		assert.Equal(t, isSkipped("small_note.md"), false, "should not skip small files")
+		assert.Equal(t, isSkipped("big_note.md"), true, "should skip big files")
+		assert.Equal(t, isSkipped("image.png"), false, "should not skip images")
+	})
+
+	t.Run("skip function should be passed to watcher", func(t *testing.T) {
+		iSync := New(fs, ".", nil, func(s *ImageSync) {
+			s.maxFileSize = 2 * 1024
+		})
+		iSync.ProcessFiles()
+		assert.Contains(t, iSync.Files, "small_note.md", "should not skip small files")
+		assert.NotContains(t, iSync.Files, "big_note.md", "should skip big files")
+		assert.Equal(t, iSync.Files["note.md"], []LinkInfo{{rootPath: "image.png", path: "image.png", fullLink: "![](image.png)"}})
+	})
+
+}
