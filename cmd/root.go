@@ -32,13 +32,14 @@ func getConfig(cmd *cobra.Command) syncer.ProgramCfg {
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "imagesync",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "Syncronize image links in Markdown and HTML files",
+	Long: `Syncronize image links in Markdown and HTML files
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Launch the program in the root directory that contains note files and images.
+Use 'watch' command to watch for changes automatically.
+
+Internally, watcher polls the filesystem, so don't use the program inside the root directory of the filesystem or in the folders with large number of files.
+`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	Run: func(cmd *cobra.Command, args []string) {
