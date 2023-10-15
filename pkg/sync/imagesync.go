@@ -81,7 +81,12 @@ func New(fileSystem fs.FS, root string, logger log.Logger, options ...func(*Imag
 
 var extractImages = GetImagesFromFile
 var writeFile = func(absPath string, data []byte) error {
-	return os.WriteFile(absPath, data, 0644)
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(absPath, data, info.Mode())
 }
 
 func (s *ImageSync) processDirs(dirs []string) {
