@@ -32,9 +32,14 @@ func mockWriteFile(t *testing.T) (*map[string]string, func()) {
 func TestProcessFiles(t *testing.T) {
 	mapFS, wantFiles, wantRefs := GetTestFileSys()
 	iSync := NewTestISync(mapFS, "notes")
-	iSync.ProcessFiles()
+	_ = iSync.ProcessFiles()
 	assert.Equal(t, wantFiles, iSync.Files)
 	assert.Equal(t, wantRefs, iSync.Images)
+
+	t.Run("number of files", func(t *testing.T) {
+		assert.Equal(t, iSync.SourcesNum(), len(wantFiles))
+		assert.Equal(t, iSync.RefsNum(), len(wantRefs))
+	})
 }
 
 func TestRemoveFile(t *testing.T) {

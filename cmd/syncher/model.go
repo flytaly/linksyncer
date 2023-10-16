@@ -19,7 +19,8 @@ import (
 type Status int
 
 const (
-	Watching Status = iota
+	Initial Status = iota
+	Watching
 	Waiting
 	ShouldConfirm
 	Quitting
@@ -52,22 +53,32 @@ type model struct {
 	logCh   chan log.Record
 	logs    []log.Record
 	showLog bool
+
+	duration time.Duration
 }
 
 // Init optionally returns an initial command we should run.
 func (m model) Init() tea.Cmd {
-	m.syncer.ProcessFiles()
-
 	cmds := []tea.Cmd{
+		processFiles(m),
 		listenForMoves(m),
 		waitForMoves(m.movesChan),
 		waitForLogs(m.logCh),
+		m.spinner.Tick,
 	}
-	if m.status == Watching {
-		cmds = append(cmds, watch(m), m.spinner.Tick)
-		return tea.Batch(cmds...)
-	}
+
 	return tea.Batch(cmds...)
+}
+
+type fileProcessed struct {
+	d time.Duration
+}
+
+func processFiles(m model) tea.Cmd {
+	return func() tea.Msg {
+		d := m.syncer.ProcessFiles()
+		return fileProcessed{d}
+	}
 }
 
 func watch(m model) tea.Cmd {
@@ -117,6 +128,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showLog = !m.showLog
 			return m, nil
 		}
+	case fileProcessed:
+		m.duration = msg.d
+		if m.pollinterval > 0 {
+			m.status = Watching
+			return m, tea.Batch(watch(m), m.spinner.Tick)
+		}
+		m.status = Waiting
+		return m, nil
 	case tea.WindowSizeMsg:
 		// If we set a width on the help menu it can gracefully truncate
 		// its view as needed.
@@ -139,7 +158,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logs = append(m.logs, msg)
 		return m, waitForLogs(m.logCh)
 	case spinner.TickMsg:
-		if m.status != Watching {
+		if m.status != Watching && m.status != Initial {
 			return m, nil
 		}
 		var cmd tea.Cmd
@@ -153,14 +172,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // rendered to the terminal.
 func (m model) View() string {
 	result := fmt.Sprintf("Path %s", color.Cyan.Sprint(m.root))
+
+	if m.status != Initial {
+		result += m.renderStats()
+	}
+
 	switch m.status {
+	case Initial:
+		result += fmt.Sprintf("\n%s Scanning directory...", m.spinner.View())
+		return result
 	case Watching:
-		result += fmt.Sprintf("\n%s Watch for changes", m.spinner.View())
+		result += fmt.Sprintf("\n\n%s Watch for changes", m.spinner.View())
 	case ShouldConfirm:
 		result += "\nMoves:\n" + printMoves(m.moves, 6, 80)
-		result += fmt.Sprintf("\n%s Press '%s' to update links or %s to skip", color.Green.Sprint("➜"), color.Green.Sprint("y"), color.Green.Sprint("n"))
+		result += fmt.Sprintf("\n\n%s Press '%s' to update links or %s to skip", color.Green.Sprint("➜"), color.Green.Sprint("y"), color.Green.Sprint("n"))
 	case Waiting:
-		result += fmt.Sprintf("\n%s Press '%s' to check the path for changes", color.Green.Sprint("➜"), color.Green.Sprint("Enter"))
+		result += fmt.Sprintf("\n\n%s Press '%s' to check the path for changes", color.Green.Sprint("➜"), color.Green.Sprint("Enter"))
 	}
 
 	helpView := m.help.View(m.keys)
@@ -172,6 +199,19 @@ func (m model) View() string {
 	}
 
 	return appStyle.Render(result)
+}
+
+func (m model) renderStats() string {
+	result := logTextStyle.Render(fmt.Sprintf("\n%d source files. %d linked images.",
+		m.syncer.SourcesNum(),
+		m.syncer.RefsNum(),
+	))
+
+	if m.duration > time.Second {
+		return result + logErrorStyle.Render(fmt.Sprintf(" [%.1f seconds]", m.duration.Seconds()))
+	}
+
+	return result + logTextStyle.Render(fmt.Sprintf("[%d ms]", m.duration.Milliseconds()))
 }
 
 func (m model) renderLog() string {
@@ -213,11 +253,6 @@ func NewProgram(cfg ProgramCfg) *tea.Program {
 		},
 	)
 
-	status := Waiting
-	if cfg.Interval > 0 {
-		status = Watching
-	}
-
 	helpModel := help.New()
 
 	return tea.NewProgram(model{
@@ -226,7 +261,7 @@ func NewProgram(cfg ProgramCfg) *tea.Program {
 		root:         cfg.Root,
 		syncer:       syncer,
 		pollinterval: cfg.Interval,
-		status:       status,
+		status:       Initial,
 		movesChan:    make(chan movesMsg),
 		spinner:      newSpinner(),
 		logCh:        logChannel,

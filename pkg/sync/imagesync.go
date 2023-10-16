@@ -109,8 +109,10 @@ func (s *ImageSync) isParsable(f string) bool {
 }
 
 // ProcessFiles walks the file tree and adds valid files
-func (s *ImageSync) ProcessFiles() {
+func (s *ImageSync) ProcessFiles() time.Duration {
+	t := time.Now()
 	s.processDirs([]string{s.root})
+	return time.Since(t)
 }
 
 // AddFile reads,  parses and save info about given file and its links
@@ -334,6 +336,7 @@ func (s *ImageSync) WatchEvents(onMoves func(moves map[string]string)) {
 		case event := <-s.Watcher.Events():
 			s.processEvent(event, &moves)
 		case <-s.Watcher.ScanComplete():
+			// TODO: scan complete event, send duration
 			if len(moves) == 0 {
 				break
 			}
@@ -358,6 +361,14 @@ func (s *ImageSync) StartFileWatcher(interval time.Duration) {
 	if err != nil {
 		s.log.Error("%s", err)
 	}
+}
+
+func (s ImageSync) RefsNum() int {
+	return len(s.Images)
+}
+
+func (s ImageSync) SourcesNum() int {
+	return len(s.Files)
 }
 
 func (s *ImageSync) Scan() {
