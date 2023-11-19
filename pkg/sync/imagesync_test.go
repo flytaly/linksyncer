@@ -14,6 +14,14 @@ func NewTestISync(fs fs.FS, root string) *ImageSync {
 	return New(fs, root, nil)
 }
 
+func NewTestISyncWithFS(root string) (*ImageSync, fstest.MapFS) {
+	fs, filesWithLinks, linkedFiles := GetTestFileSys()
+	iSync := NewTestISync(fs, root)
+	iSync.Files = filesWithLinks
+	iSync.Images = linkedFiles
+	return iSync, fs
+}
+
 func mockWriteFile(t *testing.T) (*map[string]string, func()) {
 	t.Helper()
 	original := writeFile
@@ -48,10 +56,7 @@ func TestRemoveFile(t *testing.T) {
 	img1 := "notes/folder/assets/image01.png"
 	img2 := "notes/folder/assets/image02.png"
 	t.Run("remove note 1", func(t *testing.T) {
-		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := NewTestISync(fs, ".")
-		iSync.Files = filesWithLinks
-		iSync.Images = linkedFiles
+		iSync, _ := NewTestISyncWithFS(".")
 
 		assert.Contains(t, iSync.Files, note1)
 		iSync.RemoveFile(note1)
@@ -62,10 +67,7 @@ func TestRemoveFile(t *testing.T) {
 	})
 
 	t.Run("remove note 2", func(t *testing.T) {
-		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := NewTestISync(fs, ".")
-		iSync.Files = filesWithLinks
-		iSync.Images = linkedFiles
+		iSync, _ := NewTestISyncWithFS(".")
 
 		assert.Contains(t, iSync.Files, note2)
 		iSync.RemoveFile(note2)
@@ -79,10 +81,7 @@ func TestRemoveFile(t *testing.T) {
 
 func TestUpdateFile(t *testing.T) {
 	t.Run("clear content", func(t *testing.T) {
-		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := NewTestISync(fs, ".")
-		iSync.Files = filesWithLinks
-		iSync.Images = linkedFiles
+		iSync, fs := NewTestISyncWithFS(".")
 
 		file := "notes/folder/note.md"
 		fs[file] = &fstest.MapFile{Data: []byte("")}
@@ -91,10 +90,7 @@ func TestUpdateFile(t *testing.T) {
 	})
 
 	t.Run("update file", func(t *testing.T) {
-		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := NewTestISync(fs, ".")
-		iSync.Files = filesWithLinks
-		iSync.Images = linkedFiles
+		iSync, fs := NewTestISyncWithFS(".")
 
 		file := "notes/folder/note.md"
 		fs[file] = &fstest.MapFile{Data: []byte(`![alt text](./assets/image.png)`)}
@@ -108,10 +104,7 @@ func TestUpdateFile(t *testing.T) {
 }
 
 func TestMoveFile(t *testing.T) {
-	fs, filesWithLinks, linkedFiles := GetTestFileSys()
-	iSync := NewTestISync(fs, ".")
-	iSync.Files = filesWithLinks
-	iSync.Images = linkedFiles
+	iSync, fs := NewTestISyncWithFS(".")
 
 	from := "notes/folder/note.md"
 	to := "notes/renamed.md"
@@ -142,13 +135,9 @@ func TestMoveFile(t *testing.T) {
 }
 
 func TestUpdateImageLinks(t *testing.T) {
-	fs, filesWithLinks, linkedFiles := GetTestFileSys()
-	iSync := NewTestISync(fs, ".")
-	iSync.Files = filesWithLinks
-	iSync.Images = linkedFiles
+	iSync, _ := NewTestISyncWithFS(".")
 
 	note := "notes/folder/note.md"
-	// note2 := "notes/folder/note2.md"
 
 	imgs := []MovedLink{{
 		to:   "notes/imgs/renamed.png",
@@ -175,19 +164,16 @@ func TestUpdateImageLinks(t *testing.T) {
 	}
 
 	assert.Contains(t, iSync.Files[note],
-		LinkInfo{rootPath: "notes/imgs/renamed.png", path: "../imgs/renamed.png", fullLink: "![alt text](../imgs/renamed.png)"},
+		LinkInfo{rootPath: "notes/imgs/renamed.png",
+			path:     "../imgs/renamed.png",
+			fullLink: "![alt text](../imgs/renamed.png)"},
 		"should contain updated link")
-	assert.NotContains(t, iSync.Files[note],
-		imgs[0],
-		"old link should be removed")
+	assert.NotContains(t, iSync.Files[note], imgs[0], "old link should be removed")
 }
 
 func TestSync(t *testing.T) {
 	t.Run("t1", func(t *testing.T) {
-		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := NewTestISync(fs, ".")
-		iSync.Files = filesWithLinks
-		iSync.Images = linkedFiles
+		iSync, fs := NewTestISyncWithFS(".")
 
 		movedNotes := []struct {
 			from string
@@ -296,10 +282,7 @@ func TestWatch(t *testing.T) {
 	})
 
 	t.Run("REMOVE", func(t *testing.T) {
-		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := NewTestISync(fs, ".")
-		iSync.Files = filesWithLinks
-		iSync.Images = linkedFiles
+		iSync, _ := NewTestISyncWithFS(".")
 		go iSync.Watch(time.Second)
 		name := "notes/folder/note.md"
 		assert.Contains(t, iSync.Files, name)
@@ -310,10 +293,7 @@ func TestWatch(t *testing.T) {
 	})
 
 	t.Run("WRITE", func(t *testing.T) {
-		fs, filesWithLinks, linkedFiles := GetTestFileSys()
-		iSync := NewTestISync(fs, ".")
-		iSync.Files = filesWithLinks
-		iSync.Images = linkedFiles
+		iSync, fs := NewTestISyncWithFS(".")
 		go iSync.Watch(time.Second)
 		name := "notes/folder/note.md"
 		fs[name] = &fstest.MapFile{Data: []byte("")}
