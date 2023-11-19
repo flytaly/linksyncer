@@ -3,6 +3,7 @@ package imagesync
 import (
 	"fmt"
 	"imagesync/testutils"
+	"net/url"
 	"path/filepath"
 	"testing"
 
@@ -19,6 +20,7 @@ func mdImages() map[string][]string {
 		`![alt text](../assets/img4.svg "title")`:                      {"../assets/img4.svg"},
 		`![alt text](../../outside_dir/img5.svg)`:                      {"../../outside_dir/img5.svg"},
 		`![alt text](./non_latin/изображение.svg)`:                     {"./non_latin/изображение.svg"},
+		`![alt text](./%D0%B8/%D1%81%D1%85%D0%B5%D0%BC%D0%B0.svg)`:     {"./%D0%B8/%D1%81%D1%85%D0%B5%D0%BC%D0%B0.svg"}, // encoded
 		`![alt text][imgid1] \n[imgid1]: assets/ref_image.png "title"`: {"assets/ref_image.png", "[imgid1]: assets/ref_image.png"},
 		"[![video](./assets/img6.png)](https://youtube.com)":           {"./assets/img6.png", "![video](./assets/img6.png)"},
 		"[![](./assets/img7.png)](https://youtube.com)":                {"./assets/img7.png", "![](./assets/img7.png)"},
@@ -46,8 +48,9 @@ func makeMarkdown(basepath string) (string, []LinkInfo) {
 			textLink = link[1]
 		}
 		absPath := link[0]
+		absPath, _ = url.PathUnescape(absPath)
 		if !filepath.IsAbs(absPath) {
-			absPath = filepath.Join(basepath, link[0])
+			absPath = filepath.Join(basepath, absPath)
 		}
 		images = append(images, LinkInfo{rootPath: absPath, path: link[0], fullLink: textLink})
 		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, textLink)

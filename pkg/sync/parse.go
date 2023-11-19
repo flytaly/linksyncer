@@ -2,6 +2,7 @@ package imagesync
 
 import (
 	"bytes"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -86,14 +87,19 @@ func GetImagesFromFile(filePath string, content string) []LinkInfo {
 
 	for _, l := range links {
 		link, path := l[0], l[1]
-		if !filepath.IsAbs(l[1]) {
-			dir := filepath.Dir(filePath)
-			// save as path with slash for consistency on Windows
-			info := LinkInfo{fullLink: link, path: path, rootPath: filepath.ToSlash(filepath.Join(dir, path))}
-			result = append(result, info)
-		} else {
-			result = append(result, LinkInfo{fullLink: link, path: path, rootPath: path})
+		decoded, err := url.PathUnescape(path)
+		if err != nil {
+			decoded = path
 		}
+
+		if filepath.IsAbs(path) {
+			result = append(result, LinkInfo{fullLink: link, path: path, rootPath: decoded})
+			continue
+		}
+		dir := filepath.Dir(filePath)
+		// save as path with slash for consistency on Windows
+		info := LinkInfo{fullLink: link, path: path, rootPath: filepath.ToSlash(filepath.Join(dir, decoded))}
+		result = append(result, info)
 	}
 
 	return result

@@ -26,6 +26,8 @@ Lorem ipsum dolor sit amet, qui minim labore adipisicing minim sint cillum sint 
 
 ![img3](./images/name%20with%20spaces.png)
 
+![img](images/картинка.jpg)
+
 ## Img reference
 
 ![Alt text][imgid1]

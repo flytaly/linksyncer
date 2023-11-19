@@ -42,6 +42,11 @@ var testFiles = map[string]testFile{
 		fType:    parsable,
 		hasLinks: []LinkInfo{{rootPath: "notes/index.png", path: "./index.png", fullLink: "![alt text](./index.png)"}},
 	},
+	"notes/инфо.md": {
+		mapFile:  &fstest.MapFile{Data: []byte("![alt text](./%D0%BA%D0%B0%D1%80%D1%82%D0%B8%D0%BD%D0%BA%D0%B0.png)")},
+		fType:    parsable,
+		hasLinks: []LinkInfo{{rootPath: "notes/картинка.png", path: "./%D0%BA%D0%B0%D1%80%D1%82%D0%B8%D0%BD%D0%BA%D0%B0.png", fullLink: "![alt text](./%D0%BA%D0%B0%D1%80%D1%82%D0%B8%D0%BD%D0%BA%D0%B0.png)"}},
+	},
 	"notes/folder/assets/image01.png": {
 		mapFile:   &fstest.MapFile{},
 		fType:     image,
@@ -56,6 +61,11 @@ var testFiles = map[string]testFile{
 		mapFile:   &fstest.MapFile{},
 		fType:     image,
 		wasLinked: []string{"notes/index.md"},
+	},
+	"notes/картинка.png": {
+		mapFile:   &fstest.MapFile{},
+		fType:     image,
+		wasLinked: []string{"notes/инфо.md"},
 	},
 }
 
