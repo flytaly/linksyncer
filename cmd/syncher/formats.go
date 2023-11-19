@@ -27,9 +27,9 @@ func printMoves(moves map[string]string, limit int, maxWidth int) string {
 }
 
 func tail(s string, n int) string {
-	if (len(s) - n) <= 0 {
+	r := []rune(s)
+	if (len(r) - n) <= 0 {
 		return s
 	}
-	r := []rune(s)
 	return "..." + string(r[len(r)-(n-3):])
 }
