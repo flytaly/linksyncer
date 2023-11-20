@@ -69,6 +69,14 @@ func filterImages(paths [][]string) [][]string {
 	return result
 }
 
+func decodePath(path string) string {
+	decoded, err := url.PathUnescape(path)
+	if err != nil {
+		decoded = path
+	}
+	return decoded
+}
+
 // Extracts images from a file's content. filePath argument should be absolute.
 func GetImagesFromFile(filePath string, content string) []LinkInfo {
 	var links [][]string
@@ -87,10 +95,7 @@ func GetImagesFromFile(filePath string, content string) []LinkInfo {
 
 	for _, l := range links {
 		link, path := l[0], l[1]
-		decoded, err := url.PathUnescape(path)
-		if err != nil {
-			decoded = path
-		}
+		decoded := decodePath(path)
 
 		if filepath.IsAbs(path) {
 			result = append(result, LinkInfo{fullLink: link, path: path, rootPath: decoded})

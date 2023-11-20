@@ -3,7 +3,6 @@ package imagesync
 import (
 	"fmt"
 	"imagesync/testutils"
-	"net/url"
 	"path/filepath"
 	"testing"
 
@@ -50,7 +49,7 @@ func makeMarkdown(basepath string) (string, []LinkInfo) {
 			textLink = link[1]
 		}
 		absPath := link[0]
-		absPath, _ = url.PathUnescape(absPath)
+		absPath = decodePath(absPath)
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(basepath, absPath)
 		}
