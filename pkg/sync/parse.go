@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	mdImage    = `!\[.*?\]\(\s?(.+?)\s?(?:".+?")?\)`                                         // ![alternate text](imgpath "title")
-	mdImageRef = `\[.*?\]:\s?(\S+)`                                                          // [image_id]: imgpath "title"
-	htmlImage  = "<img" + "(?:.|\n)+?" + `src\s?=\s?(?:"(.+?)"|(\S*))` + "(?:.|\n)+?" + "/>" // <img .. src="imgpath" ... />
+	mdImage    = `!\[.*?\]\(\s?(.+?)\s?(?:".+?")?\)`                                                 // ![alternate text](imgpath "title")
+	mdImageRef = `\[.*?\]:\s?(\S+)`                                                                  // [image_id]: imgpath "title"
+	htmlImage  = "<img" + "(?:.|\n)+?" + `src\s?=\s?(?:"(.+?)"|'(.+?)'|(\S*))` + "(?:.|\n)+?" + "/>" // <img .. src="imgpath" ... />
 )
 
 var mdRegexp = regexp.MustCompile(mdImage + "|" + mdImageRef + "|" + htmlImage)

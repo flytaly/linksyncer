@@ -32,6 +32,8 @@ func htmlImages() map[string]string {
 		`<img src="assets/img7.webp" alt="alt text" style="zoom:50%;" />`: "assets/img7.webp",
 		`<img src = "../assets/img8.png" alt="alt text" />`:               "../assets/img8.png",
 		`<img src=img9.png alt="alt text" />`:                             "img9.png",
+		`<img src=images/"quotes".png  />`:                                `images/"quotes".png`,
+		`<img src='images/"quotes2".png' alt="alt text" />`:               `images/"quotes2".png`,
 	}
 }
 
