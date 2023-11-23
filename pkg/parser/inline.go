@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bytes"
-	"strconv"
 )
 
 // Parsing of inline elements
@@ -417,6 +416,7 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 		link := &Link{
 			Destination: uLink,
 			Title:       title,
+			Leaf:        Leaf{Content: data[:i]},
 		}
 		if len(altContent) > 0 {
 			p.AppendNode(newTextNode(altContent))
@@ -434,6 +434,7 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 		image := &Image{
 			Destination: uLink,
 			Title:       title,
+			Leaf:        Leaf{Content: data[:i]},
 		}
 		p.AppendNode(newTextNode(data[1:txtE]))
 		return i + 1, image
@@ -551,45 +552,6 @@ func unescapeText(ob *bytes.Buffer, src []byte) {
 		ob.WriteByte(src[i+1])
 		i += 2
 	}
-}
-
-// '&' escaped when it doesn't belong to an entity
-// valid entities are assumed to be anything matching &#?[A-Za-z0-9]+;
-func entity(p *Parser, data []byte, offset int) (int, Node) {
-	data = data[offset:]
-
-	end := skipCharN(data, 1, '#', 1)
-	end = skipAlnum(data, end)
-
-	if end < len(data) && data[end] == ';' {
-		end++ // real entity
-	} else {
-		return 0, nil // lone '&'
-	}
-
-	ent := data[:end]
-	// undo &amp; escaping or it will be converted to &amp;amp; by another
-	// escaper in the renderer
-	if bytes.Equal(ent, []byte("&amp;")) {
-		return end, newTextNode([]byte{'&'})
-	}
-	if len(ent) < 4 {
-		return end, newTextNode(ent)
-	}
-
-	// if ent consists solely out of numbers (hex or decimal) convert that unicode codepoint to actual rune
-	codepoint := uint64(0)
-	var err error
-	if ent[2] == 'x' || ent[2] == 'X' { // hexadecimal
-		codepoint, err = strconv.ParseUint(string(ent[3:len(ent)-1]), 16, 64)
-	} else {
-		codepoint, err = strconv.ParseUint(string(ent[2:len(ent)-1]), 10, 64)
-	}
-	if err == nil { // only if conversion was valid return here.
-		return end, newTextNode([]byte(string(rune(codepoint))))
-	}
-
-	return end, newTextNode(ent)
 }
 
 // return the length of the given tag, or 0 is it's not valid
