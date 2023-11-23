@@ -48,6 +48,20 @@ func New() *Parser {
 	return &p
 }
 
+func (p *Parser) LinksAndImages() ([]Link, []Image) {
+	links := []Link{}
+	images := []Image{}
+	for _, v := range p.Nodes {
+		if link, ok := v.(*Link); ok {
+			links = append(links, *link)
+		}
+		if img, ok := v.(*Image); ok {
+			images = append(images, *img)
+		}
+	}
+	return links, images
+}
+
 func (p *Parser) AppendNode(n Node) {
 	p.Nodes = append(p.Nodes, n)
 }
