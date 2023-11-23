@@ -73,6 +73,7 @@ func (p *Parser) Parse(input []byte) {
 	for _, block := range p.Blocks {
 		p.Inline(block.GetContent())
 	}
+	p.Blocks = []Container{}
 }
 
 type reference struct {
