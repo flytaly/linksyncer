@@ -167,6 +167,7 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 		i                       = 1
 		title, link, altContent []byte
 		textHasNl               = false
+		refDefContent           []byte // save markdown content from reference definition
 	)
 
 	// look for the matching closing bracket
@@ -308,7 +309,6 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 	// reference style link
 	case isReferenceStyleLink(data, i, t):
 		var id []byte
-		altContentConsidered := false
 
 		// look for the id
 		i++
@@ -337,7 +337,6 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 				id = b.Bytes()
 			} else {
 				id = data[1:txtE]
-				altContentConsidered = true
 			}
 		} else {
 			id = data[linkB:linkE]
@@ -352,9 +351,7 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 		// keep link and title from reference
 		link = lr.link
 		title = lr.title
-		if altContentConsidered {
-			altContent = lr.text
-		}
+		refDefContent = lr.content
 		i++
 
 	// shortcut reference style link or reference or inline footnote
@@ -389,9 +386,6 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 		link = lr.link
 		// if inline footnote, title == footnote contents
 		title = lr.title
-		if len(lr.text) > 0 {
-			altContent = lr.text
-		}
 
 		// rewind the whitespace
 		i = txtE + 1
@@ -410,13 +404,23 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 		// [bla]() is also legal in CommonMark, so allow empty uLink
 	}
 
+	// Use the reference's definition md content. This is necessary for replacing in synchronizer,
+	// as it doesn't care about the ref itself, but only about the file path
+	// which is located in the definition block
+	var content []byte
+	if len(refDefContent) > 0 {
+		content = refDefContent
+	} else {
+		content = data[:i]
+	}
+
 	// call the relevant rendering function
 	switch t {
 	case linkNormal:
 		link := &Link{
 			Destination: uLink,
 			Title:       title,
-			Leaf:        Leaf{Content: data[:i]},
+			Leaf:        Leaf{Content: content},
 		}
 		if len(altContent) > 0 {
 			p.AppendNode(newTextNode(altContent))
@@ -434,7 +438,7 @@ func link(p *Parser, data []byte, offset int) (int, Node) {
 		image := &Image{
 			Destination: uLink,
 			Title:       title,
-			Leaf:        Leaf{Content: data[:i]},
+			Leaf:        Leaf{Content: content},
 		}
 		p.AppendNode(newTextNode(data[1:txtE]))
 		return i + 1, image

@@ -360,14 +360,6 @@ func skipUntilChar(data []byte, i int, c byte) int {
 	return i
 }
 
-func skipAlnum(data []byte, i int) int {
-	n := len(data)
-	for i < n && IsAlnum(data[i]) {
-		i++
-	}
-	return i
-}
-
 func skipSpace(data []byte, i int) int {
 	n := len(data)
 	for i < n && IsSpace(data[i]) {

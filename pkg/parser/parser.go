@@ -91,17 +91,13 @@ func (p *Parser) Parse(input []byte) {
 }
 
 type reference struct {
-	link     []byte
-	title    []byte
-	noteID   int // 0 if not a footnote ref
-	hasBlock bool
-
-	text []byte // only gets populated by refOverride feature with Reference.Text
+	link    []byte
+	title   []byte
+	content []byte // markdown content
 }
 
 func (r *reference) String() string {
-	return fmt.Sprintf("{link: %q, title: %q, text: %q, noteID: %d, hasBlock: %v}",
-		r.link, r.title, r.text, r.noteID, r.hasBlock)
+	return fmt.Sprintf("{link: %q, title: %q}", r.link, r.title)
 }
 
 // Check whether or not data starts with a reference link.
@@ -119,8 +115,6 @@ func isReference(p *Parser, data []byte, tabSize int) int {
 		i++
 	}
 
-	noteID := 0
-
 	// id part: anything but a newline between brackets
 	if data[i] != '[' {
 		return 0
@@ -136,7 +130,7 @@ func isReference(p *Parser, data []byte, tabSize int) int {
 	idEnd := i
 	// footnotes can have empty ID, like this: [^], but a reference can not be
 	// empty like this: []. Break early if it's not a footnote and there's no ID
-	if noteID == 0 && idOffset == idEnd {
+	if idOffset == idEnd {
 		return 0
 	}
 	// spacer: colon (space | tab)* newline? (space | tab)*
@@ -165,8 +159,6 @@ func isReference(p *Parser, data []byte, tabSize int) int {
 		linkOffset, linkEnd   int
 		titleOffset, titleEnd int
 		lineEnd               int
-		raw                   []byte
-		hasBlock              bool
 	)
 
 	linkOffset, linkEnd, titleOffset, titleEnd, lineEnd = scanLinkRef(p, data, i)
@@ -176,20 +168,10 @@ func isReference(p *Parser, data []byte, tabSize int) int {
 
 	// a valid ref has been found
 
-	ref := &reference{
-		noteID:   noteID,
-		hasBlock: hasBlock,
-	}
-
-	if noteID > 0 {
-		// reusing the link field for the id since footnotes don't have links
-		ref.link = data[idOffset:idEnd]
-		// if footnote, it's not really a title, it's the contained text
-		ref.title = raw
-	} else {
-		ref.link = data[linkOffset:linkEnd]
-		ref.title = data[titleOffset:titleEnd]
-	}
+	ref := &reference{}
+	ref.link = data[linkOffset:linkEnd]
+	ref.title = data[titleOffset:titleEnd]
+	ref.content = data[:linkEnd]
 
 	// id matches are case-insensitive
 	id := string(bytes.ToLower(data[idOffset:idEnd]))

@@ -19,7 +19,7 @@ func toLinkFlat(l Link) linkFlat {
 
 func TestParse(t *testing.T) {
 	t.Run("Normal Links", func(t *testing.T) {
-		var data = []linkFlat{
+		data := []linkFlat{
 			{"./some file.md", "title", "[text](<./some file.md> \"title\")"},
 			{"./with (parenthesis).md", "title", "[text](./with (parenthesis).md \"title\")"},
 			{"./foo.md", "(bar)", "[[1]](./foo.md '(bar)')"},
@@ -60,5 +60,31 @@ func TestParse(t *testing.T) {
 				assert.Equal(t, tt.want, toLinkFlat(Link(got[0])))
 			})
 		}
+	})
+
+	t.Run("Ref links", func(t *testing.T) {
+		md := "[text][ref]\n\n[ref]: ref_file.md \"title\""
+		l := linkFlat{"ref_file.md", "title", "[ref]: ref_file.md"}
+
+		p := New()
+		p.Parse([]byte(md))
+		got, _ := p.LinksAndImages()
+		if len(got) != 1 {
+			t.Fatalf("should be exactly one link, got %d", len(got))
+		}
+		assert.Equal(t, l, toLinkFlat(got[0]))
+	})
+
+	t.Run("Ref images", func(t *testing.T) {
+		md := "![alt text][ref_img]\n\n[ref_img]: ref_image.png \"my image\""
+		l := linkFlat{"ref_image.png", "my image", "[ref_img]: ref_image.png"}
+
+		p := New()
+		p.Parse([]byte(md))
+		_, got := p.LinksAndImages()
+		if len(got) != 1 {
+			t.Fatalf("should be exactly one link, got %d", len(got))
+		}
+		assert.Equal(t, l, toLinkFlat(Link(got[0])))
 	})
 }
