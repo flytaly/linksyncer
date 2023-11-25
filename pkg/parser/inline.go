@@ -467,57 +467,20 @@ func (p *Parser) inlineHTMLComment(data []byte) int {
 	return i + 1
 }
 
-func stripMailto(link []byte) []byte {
-	if bytes.HasPrefix(link, []byte("mailto://")) {
-		return link[9:]
-	} else if bytes.HasPrefix(link, []byte("mailto:")) {
-		return link[7:]
-	} else {
-		return link
-	}
-}
-
-// autolinkType specifies a kind of autolink that gets detected.
-type autolinkType int
-
-// These are the possible flag values for the autolink renderer.
-const (
-	notAutolink autolinkType = iota
-	normalAutolink
-	emailAutolink
-)
-
-// '<' when tags or autolinks are allowed
+// '<'
 func leftAngle(p *Parser, data []byte, offset int) (int, Node) {
 	data = data[offset:]
 
-	altype, end := tagLength(data)
+	end := tagLength(data)
 	if size := p.inlineHTMLComment(data); size > 0 {
 		end = size
 	}
 	if end <= 2 {
 		return end, nil
 	}
-	if altype == notAutolink {
-		htmlTag := &HTMLSpan{}
-		htmlTag.Literal = data[:end]
-		return end, htmlTag
-	}
-
-	var uLink bytes.Buffer
-	unescapeText(&uLink, data[1:end+1-2])
-	if uLink.Len() <= 0 {
-		return end, nil
-	}
-	link := uLink.Bytes()
-	node := &Link{
-		Destination: link,
-	}
-	if altype == emailAutolink {
-		node.Destination = append([]byte("mailto:"), link...)
-	}
-	p.AppendNode(newTextNode(stripMailto(link)))
-	return end, node
+	htmlTag := &HTMLSpan{}
+	htmlTag.Literal = data[:end]
+	return end, htmlTag
 }
 
 // '\\' backslash escape
@@ -559,18 +522,19 @@ func unescapeText(ob *bytes.Buffer, src []byte) {
 }
 
 // return the length of the given tag, or 0 is it's not valid
-func tagLength(data []byte) (autolink autolinkType, end int) {
-	var i, j int
+func tagLength(data []byte) (end int) {
+	var i int
 
 	// a valid tag can't be shorter than 3 chars
 	if len(data) < 3 {
-		return notAutolink, 0
+		return 0
 	}
 
 	// begins with a '<' optionally followed by '/', followed by letter or number
 	if data[0] != '<' {
-		return notAutolink, 0
+		return 0
 	}
+
 	if data[1] == '/' {
 		i = 2
 	} else {
@@ -578,92 +542,14 @@ func tagLength(data []byte) (autolink autolinkType, end int) {
 	}
 
 	if !IsAlnum(data[i]) {
-		return notAutolink, 0
+		return 0
 	}
 
-	// scheme test
-	autolink = notAutolink
-
-	// try to find the beginning of an URI
-	for i < len(data) && (IsAlnum(data[i]) || data[i] == '.' || data[i] == '+' || data[i] == '-') {
-		i++
-	}
-
-	if i > 1 && i < len(data) && data[i] == '@' {
-		if j = isMailtoAutoLink(data[i:]); j != 0 {
-			return emailAutolink, i + j
-		}
-	}
-
-	if i > 2 && i < len(data) && data[i] == ':' {
-		autolink = normalAutolink
-		i++
-	}
-
-	// complete autolink test: no whitespace or ' or "
-	switch {
-	case i >= len(data):
-		autolink = notAutolink
-	case autolink != notAutolink:
-		j = i
-
-		for i < len(data) {
-			if data[i] == '\\' {
-				i += 2
-			} else if data[i] == '>' || data[i] == '\'' || data[i] == '"' || IsSpace(data[i]) {
-				break
-			} else {
-				i++
-			}
-
-		}
-
-		if i >= len(data) {
-			return autolink, 0
-		}
-		if i > j && data[i] == '>' {
-			return autolink, i + 1
-		}
-
-		// one of the forbidden chars has been found
-		autolink = notAutolink
-	}
 	i += bytes.IndexByte(data[i:], '>')
 	if i < 0 {
-		return autolink, 0
+		return 0
 	}
-	return autolink, i + 1
-}
-
-// look for the address part of a mail autolink and '>'
-// this is less strict than the original markdown e-mail address matching
-func isMailtoAutoLink(data []byte) int {
-	nb := 0
-
-	// address is assumed to be: [-@._a-zA-Z0-9]+ with exactly one '@'
-	for i, c := range data {
-		if IsAlnum(c) {
-			continue
-		}
-
-		switch c {
-		case '@':
-			nb++
-
-		case '-', '.', '_':
-			// no-op but not defult
-
-		case '>':
-			if nb == 1 {
-				return i + 1
-			}
-			return 0
-		default:
-			return 0
-		}
-	}
-
-	return 0
+	return i + 1
 }
 
 func newTextNode(d []byte) *Text {
