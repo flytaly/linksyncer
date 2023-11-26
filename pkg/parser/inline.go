@@ -30,7 +30,11 @@ func (p *Parser) Inline(data []byte) {
 			continue
 		}
 		if node != nil {
-			p.AppendNode(node)
+			if html, ok := node.(*HTMLSpan); ok {
+				p.appendHTMLFragment(html.Literal)
+			} else {
+				p.AppendNode(node)
+			}
 		}
 		// skip inactive chars
 		// data[beg:end]
