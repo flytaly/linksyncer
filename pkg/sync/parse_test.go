@@ -9,23 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mdImages() map[string][]string {
-	return map[string][]string{
-		`![alt text](./assets/subfolder/image.png)`:                    {"./assets/subfolder/image.png"},
-		`![](no-alt-text.png)`:                                         {"no-alt-text.png"},
-		`![alt text](assets/img2.jpeg "image title")`:                  {"assets/img2.jpeg"},
-		`![alt text](img3.gif "title")`:                                {"img3.gif"},
-		`![alt text](/home/user/notes/assets 2/name with spaces.jpg)`:  {"/home/user/notes/assets 2/name with spaces.jpg"}, // absolute path
-		`![alt text](../assets/img4.svg "title")`:                      {"../assets/img4.svg"},
-		`![alt text](../../outside_dir/img5.svg)`:                      {"../../outside_dir/img5.svg"},
-		`![alt text](./non_latin/изображение.svg)`:                     {"./non_latin/изображение.svg"},
-		`![alt text](./%D0%B8/%D1%81%D1%85%D0%B5%D0%BC%D0%B0.svg)`:     {"./%D0%B8/%D1%81%D1%85%D0%B5%D0%BC%D0%B0.svg"}, // encoded
-		`![alt text][imgid1] \n[imgid1]: assets/ref_image.png "title"`: {"assets/ref_image.png", "[imgid1]: assets/ref_image.png"},
-		"[![video](./assets/img6.png)](https://youtube.com)":           {"./assets/img6.png", "![video](./assets/img6.png)"},
-		"[![](./assets/img7.png)](https://youtube.com)":                {"./assets/img7.png", "![](./assets/img7.png)"},
-	}
-}
-
 func htmlImages() map[string]string {
 	return map[string]string{
 		`<img src="assets/img7.webp" alt="alt text" style="zoom:50%;" />`: "assets/img7.webp",
@@ -38,39 +21,26 @@ func htmlImages() map[string]string {
 
 const lorem = "Lorem ipsum dolor sit amet"
 
-func makeMarkdown(basepath string) (string, []LinkInfo) {
-	var markdown = ` # Test file\n## Paragraph\n
-		![link to an image](https://somesite.com/picture.png)`
+func createMarkdown(basepath string, testlinks []imageTestCase) (string, []LinkInfo) {
+	markdown := "# Test file\n## Paragraph\n" + "![link to an image](https://somesite.com/picture.png)"
 
 	images := []LinkInfo{}
 
-	for textLink, link := range mdImages() {
-		if len(link) > 1 {
-			textLink = link[1]
-		}
-		absPath := link[0]
+	for _, testlink := range testlinks {
+		absPath := testlink.link
 		absPath = decodePath(absPath)
 		if !filepath.IsAbs(absPath) {
 			absPath = filepath.Join(basepath, absPath)
 		}
-		images = append(images, LinkInfo{rootPath: absPath, path: link[0], fullLink: textLink})
-		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, textLink)
-	}
-
-	for link, path := range htmlImages() {
-		absPath := path
-		if !filepath.IsAbs(absPath) {
-			absPath = filepath.Join(basepath, path)
-		}
-		images = append(images, LinkInfo{rootPath: absPath, path: path, fullLink: link})
-		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, link)
+		images = append(images, LinkInfo{rootPath: absPath, path: testlink.link, fullLink: testlink.content})
+		markdown = markdown + fmt.Sprintf("\n%s\n%s", lorem, testlink.md)
 	}
 
 	return markdown, images
 }
 
 func makeHTML(basepath string) (string, []LinkInfo) {
-	var html = ""
+	html := ""
 	images := []LinkInfo{}
 
 	for link, path := range htmlImages() {
@@ -86,11 +56,15 @@ func makeHTML(basepath string) (string, []LinkInfo) {
 }
 
 func TestGetImagesFromFile(t *testing.T) {
-
 	t.Run("markdown", func(t *testing.T) {
-		markdown, want := makeMarkdown("/home/user/notes/my_notes")
-		got := GetImagesFromFile("/home/user/notes/my_notes/note.md", markdown)
-		assert.Equal(t, want, got)
+		for i, testcase := range mdImageCases {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				base := "/home/user/notes/my_notes/"
+				markdown, want := createMarkdown(base, []imageTestCase{testcase})
+				got := GetImagesFromFile(base+"note.md", markdown)
+				assert.Equal(t, want, got)
+			})
+		}
 	})
 
 	t.Run("html", func(t *testing.T) {
@@ -98,7 +72,6 @@ func TestGetImagesFromFile(t *testing.T) {
 		got := GetImagesFromFile("/home/user/pages/my_pages/page.html", html)
 		assert.Equal(t, want, got)
 	})
-
 }
 
 func TestReplaceImageLinks(t *testing.T) {

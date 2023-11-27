@@ -97,7 +97,7 @@ func TestUpdateFile(t *testing.T) {
 		iSync.UpdateFile(file)
 
 		newLinks := []LinkInfo{
-			{rootPath: "notes/folder/assets/image.png", path: "./assets/image.png", fullLink: "![alt text](./assets/image.png)"}}
+			{rootPath: "notes/folder/assets/image.png", path: "./assets/image.png", fullLink: "[alt text](./assets/image.png)"}}
 		assert.Equal(t, iSync.Files[file], newLinks)
 	})
 
@@ -142,7 +142,7 @@ func TestUpdateImageLinks(t *testing.T) {
 
 		imgs := []MovedLink{{
 			to:   "notes/imgs/renamed.png",
-			link: LinkInfo{rootPath: "notes/folder/assets/image01.png", path: "./assets/image01.png", fullLink: "![alt text](./assets/image01.png)"},
+			link: LinkInfo{rootPath: "notes/folder/assets/image01.png", path: "./assets/image01.png", fullLink: "[alt text](./assets/image01.png)"},
 		}}
 
 		written, restore := mockWriteFile(t)
@@ -167,7 +167,7 @@ func TestUpdateImageLinks(t *testing.T) {
 		assert.Contains(t, iSync.Files[note],
 			LinkInfo{rootPath: "notes/imgs/renamed.png",
 				path:     "../imgs/renamed.png",
-				fullLink: "![alt text](../imgs/renamed.png)"},
+				fullLink: "[alt text](../imgs/renamed.png)"},
 			"should contain updated link")
 		assert.NotContains(t, iSync.Files[note], imgs[0], "old link should be removed")
 	})
@@ -253,7 +253,7 @@ func TestSync(t *testing.T) {
 				assert.Equal(t, []LinkInfo{{
 					rootPath: "notes/index_assets/index.png",
 					path:     "index_assets/index.png",
-					fullLink: "![alt text](index_assets/index.png)",
+					fullLink: "[alt text](index_assets/index.png)",
 				}}, iSync.Files[staticNote])
 			}
 
@@ -330,7 +330,7 @@ func TestWatch(t *testing.T) {
 
 		iSync := NewTestISync(fs, ".")
 		iSync.ProcessFiles()
-		assert.Equal(t, iSync.Files[noteFrom], []LinkInfo{{rootPath: imgFrom, path: "./image1.png", fullLink: "![](./image1.png)"}})
+		assert.Equal(t, iSync.Files[noteFrom], []LinkInfo{{rootPath: imgFrom, path: "./image1.png", fullLink: "[](./image1.png)"}})
 
 		gotData, restore := mockWriteFile(t)
 		t.Cleanup(func() { restore() })
@@ -390,7 +390,7 @@ func TestSkipFiles(t *testing.T) {
 		iSync.ProcessFiles()
 		assert.Contains(t, iSync.Files, "small_note.md", "should not skip small files")
 		assert.NotContains(t, iSync.Files, "big_note.md", "should skip big files")
-		assert.Equal(t, iSync.Files["note.md"], []LinkInfo{{rootPath: "image.png", path: "image.png", fullLink: "![](image.png)"}})
+		assert.Equal(t, iSync.Files["note.md"], []LinkInfo{{rootPath: "image.png", path: "image.png", fullLink: "[](image.png)"}})
 	})
 
 }

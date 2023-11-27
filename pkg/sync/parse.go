@@ -2,6 +2,7 @@ package imagesync
 
 import (
 	"bytes"
+	mdParser "imagesync/pkg/parser"
 	"net/url"
 	"path/filepath"
 	"regexp"
@@ -54,6 +55,17 @@ func GetImgsFromHTML(content string) [][]string {
 	return extractSubmatches(htmlRegexp.FindAllStringSubmatch(content, -1))
 }
 
+func GetImgsFromMdParser(content string) [][]string {
+	p := mdParser.New()
+	p.Parse([]byte(content))
+	_, imgs := p.LinksAndImages()
+	res := [][]string{}
+	for _, img := range imgs {
+		res = append(res, []string{string(img.GetContent()), string(img.Destination)})
+	}
+	return res
+}
+
 func filterImages(paths [][]string) [][]string {
 	var result = [][]string{}
 
@@ -61,9 +73,9 @@ func filterImages(paths [][]string) [][]string {
 		if strings.Contains(v[1], ":") { // probably an URL
 			continue
 		}
-		if imageExtensions.MatchString(v[1]) {
-			result = append(result, v)
-		}
+		// if imageExtensions.MatchString(v[1]) {
+		result = append(result, v)
+		// }
 	}
 
 	return result
@@ -84,7 +96,8 @@ func GetImagesFromFile(filePath string, content string) []LinkInfo {
 
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md":
-		links = GetImgsFromMD(content)
+		// links = GetImgsFromMD(content)
+		links = GetImgsFromMdParser(content)
 	case ".html":
 		links = GetImgsFromHTML(content)
 	default:

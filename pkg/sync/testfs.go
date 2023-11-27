@@ -28,24 +28,24 @@ var testFiles = map[string]testFile{
 		mapFile: &fstest.MapFile{Data: []byte(`![alt text](./assets/image01.png)\n![alt text](./assets/image02.png)`)},
 		fType:   parsable,
 		hasLinks: []LinkInfo{
-			{rootPath: "notes/folder/assets/image01.png", path: "./assets/image01.png", fullLink: "![alt text](./assets/image01.png)"},
-			{rootPath: "notes/folder/assets/image02.png", path: "./assets/image02.png", fullLink: "![alt text](./assets/image02.png)"},
+			{rootPath: "notes/folder/assets/image01.png", path: "./assets/image01.png", fullLink: "[alt text](./assets/image01.png)"},
+			{rootPath: "notes/folder/assets/image02.png", path: "./assets/image02.png", fullLink: "[alt text](./assets/image02.png)"},
 		},
 	},
 	"notes/folder/note2.md": {
 		mapFile:  &fstest.MapFile{Data: []byte("![alt text](./assets/image02.png)")},
 		fType:    parsable,
-		hasLinks: []LinkInfo{{rootPath: "notes/folder/assets/image02.png", path: "./assets/image02.png", fullLink: "![alt text](./assets/image02.png)"}},
+		hasLinks: []LinkInfo{{rootPath: "notes/folder/assets/image02.png", path: "./assets/image02.png", fullLink: "[alt text](./assets/image02.png)"}},
 	},
 	"notes/index.md": {
 		mapFile:  &fstest.MapFile{Data: []byte("![alt text](./index.png)")},
 		fType:    parsable,
-		hasLinks: []LinkInfo{{rootPath: "notes/index.png", path: "./index.png", fullLink: "![alt text](./index.png)"}},
+		hasLinks: []LinkInfo{{rootPath: "notes/index.png", path: "./index.png", fullLink: "[alt text](./index.png)"}},
 	},
 	"notes/инфо.md": {
 		mapFile:  &fstest.MapFile{Data: []byte("![alt text](./%D0%BA%D0%B0%D1%80%D1%82%D0%B8%D0%BD%D0%BA%D0%B0.png)")},
 		fType:    parsable,
-		hasLinks: []LinkInfo{{rootPath: "notes/картинка.png", path: "./%D0%BA%D0%B0%D1%80%D1%82%D0%B8%D0%BD%D0%BA%D0%B0.png", fullLink: "![alt text](./%D0%BA%D0%B0%D1%80%D1%82%D0%B8%D0%BD%D0%BA%D0%B0.png)"}},
+		hasLinks: []LinkInfo{{rootPath: "notes/картинка.png", path: "./%D0%BA%D0%B0%D1%80%D1%82%D0%B8%D0%BD%D0%BA%D0%B0.png", fullLink: "[alt text](./%D0%BA%D0%B0%D1%80%D1%82%D0%B8%D0%BD%D0%BA%D0%B0.png)"}},
 	},
 	"notes/folder/assets/image01.png": {
 		mapFile:   &fstest.MapFile{},
