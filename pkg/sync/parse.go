@@ -93,6 +93,10 @@ func ReplaceImageLinks(fPath string, fileContent []byte, imgs []MovedLink) []byt
 		if targpath == "" {
 			targpath = img.to
 		}
+
+		// encode spaces
+		targpath = strings.Replace(targpath, " ", "%20", -1)
+
 		// Replace path in the link and then replace link in the file
 		newLink := strings.Replace(img.link.fullLink, img.link.path, targpath, 1)
 		result = bytes.ReplaceAll(result, []byte(img.link.fullLink), []byte(newLink))

@@ -141,7 +141,7 @@ func TestUpdateImageLinks(t *testing.T) {
 		note := "notes/folder/note.md"
 
 		imgs := []MovedLink{{
-			to:   "notes/imgs/renamed.png",
+			to:   "notes/imgs/renamed img.png",
 			link: LinkInfo{rootPath: "notes/folder/assets/image01.png", path: "./assets/image01.png", fullLink: "[alt text](./assets/image01.png)"},
 		}}
 
@@ -154,7 +154,7 @@ func TestUpdateImageLinks(t *testing.T) {
 		}
 
 		want := map[string]string{
-			note: `![alt text](../imgs/renamed.png)\n![alt text](./assets/image02.png)`,
+			note: `![alt text](../imgs/renamed%20img.png)\n![alt text](./assets/image02.png)`,
 		}
 		assert.Equal(t, want, *written, "image links in the file should be updated")
 
@@ -165,9 +165,9 @@ func TestUpdateImageLinks(t *testing.T) {
 		}
 
 		assert.Contains(t, iSync.Files[note],
-			LinkInfo{rootPath: "notes/imgs/renamed.png",
-				path:     "../imgs/renamed.png",
-				fullLink: "[alt text](../imgs/renamed.png)"},
+			LinkInfo{rootPath: "notes/imgs/renamed img.png",
+				path:     "../imgs/renamed%20img.png",
+				fullLink: "[alt text](../imgs/renamed%20img.png)"},
 			"should contain updated link")
 		assert.NotContains(t, iSync.Files[note], imgs[0], "old link should be removed")
 	})
