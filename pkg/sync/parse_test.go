@@ -9,16 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func htmlImages() map[string]string {
-	return map[string]string{
-		`<img src="assets/img7.webp" alt="alt text" style="zoom:50%;" />`: "assets/img7.webp",
-		`<img src = "../assets/img8.png" alt="alt text" />`:               "../assets/img8.png",
-		`<img src=img9.png alt="alt text" />`:                             "img9.png",
-		`<img src=images/"quotes".png  />`:                                `images/"quotes".png`,
-		`<img src='images/"quotes2".png' alt="alt text" />`:               `images/"quotes2".png`,
-	}
-}
-
 const lorem = "Lorem ipsum dolor sit amet"
 
 func createMarkdown(basepath string, testlinks []imageTestCase) (string, []LinkInfo) {
@@ -39,22 +29,6 @@ func createMarkdown(basepath string, testlinks []imageTestCase) (string, []LinkI
 	return markdown, images
 }
 
-func makeHTML(basepath string) (string, []LinkInfo) {
-	html := ""
-	images := []LinkInfo{}
-
-	for link, path := range htmlImages() {
-		absPath := path
-		if !filepath.IsAbs(absPath) {
-			absPath = filepath.Join(basepath, path)
-		}
-		images = append(images, LinkInfo{rootPath: absPath, path: path, fullLink: link})
-		html += fmt.Sprintf("\n%s\n%s", lorem, link)
-	}
-
-	return html, images
-}
-
 func TestGetImagesFromFile(t *testing.T) {
 	t.Run("markdown", func(t *testing.T) {
 		for i, testcase := range mdImageCases {
@@ -65,12 +39,6 @@ func TestGetImagesFromFile(t *testing.T) {
 				assert.Equal(t, want, got)
 			})
 		}
-	})
-
-	t.Run("html", func(t *testing.T) {
-		html, want := makeHTML("/home/user/pages/my_pages")
-		got := GetImagesFromFile("/home/user/pages/my_pages/page.html", html)
-		assert.Equal(t, want, got)
 	})
 }
 

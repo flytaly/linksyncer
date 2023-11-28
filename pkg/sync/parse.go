@@ -5,19 +5,8 @@ import (
 	mdParser "imagesync/pkg/parser"
 	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
 )
-
-const (
-	mdImage    = `!\[.*?\]\(\s?(.+?)\s?(?:".+?")?\)`                                                 // ![alternate text](imgpath "title")
-	mdImageRef = `\[.*?\]:\s?(\S+)`                                                                  // [image_id]: imgpath "title"
-	htmlImage  = "<img" + "(?:.|\n)+?" + `src\s?=\s?(?:"(.+?)"|'(.+?)'|(\S*))` + "(?:.|\n)+?" + "/>" // <img .. src="imgpath" ... />
-)
-
-var mdRegexp = regexp.MustCompile(mdImage + "|" + mdImageRef + "|" + htmlImage)
-var htmlRegexp = regexp.MustCompile(htmlImage)
-var imageExtensions = regexp.MustCompile("(?i)(?:" + ImgExtensions + ")$")
 
 type LinkInfo struct {
 	rootPath string
@@ -30,32 +19,7 @@ type MovedLink struct {
 	link LinkInfo
 }
 
-// return slice of non-empty capturing groups
-func extractSubmatches(groups [][]string) [][]string {
-	var result = [][]string{}
-
-	for _, v := range groups {
-		matches := []string{v[0]}
-		for _, group := range v[1:] {
-			if group != "" {
-				matches = append(matches, group)
-			}
-		}
-		result = append(result, matches)
-	}
-
-	return result
-}
-
 func GetImgsFromMD(content string) [][]string {
-	return extractSubmatches(mdRegexp.FindAllStringSubmatch(content, -1))
-}
-
-func GetImgsFromHTML(content string) [][]string {
-	return extractSubmatches(htmlRegexp.FindAllStringSubmatch(content, -1))
-}
-
-func GetImgsFromMdParser(content string) [][]string {
 	p := mdParser.New()
 	p.Parse([]byte(content))
 	_, imgs := p.LinksAndImages()
@@ -73,9 +37,7 @@ func filterImages(paths [][]string) [][]string {
 		if strings.Contains(v[1], ":") { // probably an URL
 			continue
 		}
-		// if imageExtensions.MatchString(v[1]) {
 		result = append(result, v)
-		// }
 	}
 
 	return result
@@ -96,10 +58,7 @@ func GetImagesFromFile(filePath string, content string) []LinkInfo {
 
 	switch strings.ToLower(filepath.Ext(filePath)) {
 	case ".md":
-		// links = GetImgsFromMD(content)
-		links = GetImgsFromMdParser(content)
-	case ".html":
-		links = GetImgsFromHTML(content)
+		links = GetImgsFromMD(content)
 	default:
 		return result
 	}
