@@ -299,7 +299,7 @@ func (s *ImageSync) ReadFile(filePath string) ([]byte, error) {
 	var err error
 	var relativePath = filePath
 	if filepath.IsAbs(relativePath) {
-		relativePath, err = filepath.Rel(s.root, filePath)
+		_, err = filepath.Rel(s.root, filePath)
 
 		if err != nil {
 			return nil, err
@@ -390,8 +390,11 @@ func (s *ImageSync) Watch(interval time.Duration) {
 }
 
 func (s *ImageSync) Close() {
-	s.Watcher.Close()
-	err := s.log.Close()
+	err := s.Watcher.Close()
+	if err != nil {
+		fmt.Println("Couldn't close watcher")
+	}
+	err = s.log.Close()
 	if err != nil {
 		fmt.Println("Couldn't close log file")
 	}

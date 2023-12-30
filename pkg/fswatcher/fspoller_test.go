@@ -121,7 +121,8 @@ func TestClose(t *testing.T) {
 	}()
 
 	time.Sleep(time.Millisecond)
-	p.Close()
+	err := p.Close()
+	failIfErr(t, err)
 	select {
 	case <-time.After(time.Millisecond):
 		t.Error("'done' should be closed")
@@ -130,11 +131,9 @@ func TestClose(t *testing.T) {
 			t.Errorf(`"closed" should be "true"`)
 		}
 	}
-
 }
 
 func TestEvent(t *testing.T) {
-
 	t.Run("CREATE", func(t *testing.T) {
 		fsys := createFS([]string{"file"})
 		p := makePoller(fsys, ".")
@@ -377,7 +376,12 @@ func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[strin
 
 	check := func() {
 		assert.Equal(t, want, gotEvents, "should trigger events")
-		go p.Close()
+		go func() {
+			err := p.Close()
+			if err != nil {
+				t.Errorf("watcher close error: %s", err)
+			}
+		}()
 	}
 
 	go func() {
@@ -390,7 +394,12 @@ func ExpectEvents(t *testing.T, p *fsPoller, await time.Duration, want map[strin
 				}
 			case err := <-p.Errors():
 				t.Errorf("watcher error event: %s", err)
-				go p.Close()
+				go func() {
+					err := p.Close()
+					if err != nil {
+						t.Errorf("watcher close error: %s", err)
+					}
+				}()
 			case <-p.scanDone:
 				return
 			case <-p.done:
