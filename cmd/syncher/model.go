@@ -2,11 +2,12 @@ package teaprogram
 
 import (
 	"fmt"
-	"imagesync/pkg/log"
-	imagesync "imagesync/pkg/sync"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/flytaly/imagesync/pkg/log"
+	imagesync "github.com/flytaly/imagesync/pkg/sync"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"

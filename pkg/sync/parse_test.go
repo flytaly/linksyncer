@@ -1,11 +1,11 @@
-package imagesync
+package sync
 
 import (
 	"fmt"
-	"imagesync/testutils"
 	"path/filepath"
 	"testing"
 
+	"github.com/flytaly/imagesync/testutils"
 	"github.com/stretchr/testify/assert"
 )
 

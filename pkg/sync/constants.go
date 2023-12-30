@@ -1,4 +1,4 @@
-package imagesync
+package sync
 
 var ExcludedDirs = map[string]bool{"node_modules": true}
 

@@ -1,4 +1,4 @@
-package imagesync
+package sync
 
 import (
 	"testing/fstest"

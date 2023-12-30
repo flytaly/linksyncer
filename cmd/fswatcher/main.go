@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"imagesync/pkg/fswatcher"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/flytaly/imagesync/pkg/fswatcher"
 )
 
 func main() {
@@ -53,7 +54,10 @@ func main() {
 
 	go func() {
 		s := <-sign
-		watcher.Close()
+		err := watcher.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
 		close(done)
 		if s == syscall.SIGTERM {
 			os.Exit(1)

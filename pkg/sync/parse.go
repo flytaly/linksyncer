@@ -1,11 +1,12 @@
-package imagesync
+package sync
 
 import (
 	"bytes"
-	mdParser "imagesync/pkg/parser"
 	"net/url"
 	"path/filepath"
 	"strings"
+
+	mdParser "github.com/flytaly/imagesync/pkg/parser"
 )
 
 type LinkInfo struct {

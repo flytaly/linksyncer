@@ -1,4 +1,4 @@
-module imagesync
+module github.com/flytaly/imagesync
 
 go 1.21
 

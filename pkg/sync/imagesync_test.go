@@ -1,12 +1,12 @@
-package imagesync
+package sync
 
 import (
-	"imagesync/pkg/fswatcher"
 	"io/fs"
 	"testing"
 	"testing/fstest"
 	"time"
 
+	"github.com/flytaly/imagesync/pkg/fswatcher"
 	"github.com/stretchr/testify/assert"
 )
 

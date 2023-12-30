@@ -1,9 +1,8 @@
 package teaprogram
 
 import (
-	"imagesync/pkg/log"
-
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/flytaly/imagesync/pkg/log"
 )
 
 type movesMsg map[string]string

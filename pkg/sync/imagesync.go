@@ -1,9 +1,7 @@
-package imagesync
+package sync
 
 import (
 	"fmt"
-	"imagesync/pkg/fswatcher"
-	"imagesync/pkg/log"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -11,6 +9,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/flytaly/imagesync/pkg/fswatcher"
+	"github.com/flytaly/imagesync/pkg/log"
 )
 
 type ImageSync struct {

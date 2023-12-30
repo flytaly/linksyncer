@@ -1,6 +1,6 @@
 package main
 
-import "imagesync/cmd"
+import "github.com/flytaly/imagesync/cmd"
 
 func main() {
 	cmd.Execute()

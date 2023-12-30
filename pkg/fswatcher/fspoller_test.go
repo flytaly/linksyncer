@@ -3,7 +3,6 @@ package fswatcher
 import (
 	"errors"
 	"fmt"
-	"imagesync/testutils"
 	"io/fs"
 	"os"
 	"path"
@@ -14,6 +13,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/flytaly/imagesync/testutils"
 	"github.com/stretchr/testify/assert"
 )
 

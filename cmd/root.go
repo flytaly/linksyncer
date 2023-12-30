@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	syncer "imagesync/cmd/syncher"
 	"os"
 
+	syncer "github.com/flytaly/imagesync/cmd/syncher"
 	"github.com/spf13/cobra"
 )
 
