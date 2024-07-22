@@ -1,7 +1,14 @@
 package main
 
-import "github.com/flytaly/imagesync/cmd"
+import (
+	_ "embed"
+
+	"github.com/flytaly/imagesync/cmd"
+)
+
+//go:embed version
+var version string
 
 func main() {
-	cmd.Execute()
+	cmd.Execute(version)
 }
