@@ -17,8 +17,8 @@ import (
 type ImageSync struct {
 	fileSystem  fs.FS
 	root        string                         // path to the root directory
-	Files       map[string][]LinkInfo          // watching files
-	Images      map[string]map[string]struct{} // map images' paths to their text files
+	Sources     map[string][]LinkInfo          // watching files
+	Images      map[string]map[string]struct{} // map image paths to their source files
 	MaxFileSize int64                          // max file size in bytes for parsable files
 
 	Watcher fswatcher.FsWatcher
@@ -62,7 +62,7 @@ func New(fileSystem fs.FS, root string, logger log.Logger, options ...func(*Imag
 	iSync := &ImageSync{
 		root:        root,
 		Watcher:     watcher,
-		Files:       map[string][]LinkInfo{},
+		Sources:     map[string][]LinkInfo{},
 		Images:      map[string]map[string]struct{}{},
 		fileSystem:  fileSystem,
 		stopEvents:  make(chan struct{}),
@@ -118,7 +118,7 @@ func (s *ImageSync) ProcessFiles() time.Duration {
 
 // AddFile reads,  parses and save info about given file and its links
 func (s *ImageSync) AddFile(relativePath string) {
-	s.Files[relativePath] = []LinkInfo{}
+	s.Sources[relativePath] = []LinkInfo{}
 	data, err := s.ReadFile(relativePath)
 	if err != nil {
 		s.log.Error("Couldn't read file. %s", err)
@@ -151,28 +151,28 @@ func (s *ImageSync) clearLinkReferences(sourceFilePath string, linkPath string) 
 
 // saveLinks updates links in the cache
 func (s *ImageSync) saveLinks(sourceFilePath string, links *[]LinkInfo) {
-	s.Files[sourceFilePath] = []LinkInfo{} // create new slice to clear previous links
+	s.Sources[sourceFilePath] = []LinkInfo{} // create new slice to clear previous links
 	for _, img := range *links {
 		if s.Images[img.rootPath] == nil {
 			s.Images[img.rootPath] = map[string]struct{}{}
 		}
 		s.Images[img.rootPath][sourceFilePath] = struct{}{}
-		s.Files[sourceFilePath] = append(s.Files[sourceFilePath], img)
+		s.Sources[sourceFilePath] = append(s.Sources[sourceFilePath], img)
 	}
 }
 
 // RemoveFile removes a file and its images from the cache
 func (s *ImageSync) RemoveFile(relativePath string) {
-	if images, ok := s.Files[relativePath]; ok {
+	if images, ok := s.Sources[relativePath]; ok {
 		for _, li := range images {
 			s.clearLinkReferences(relativePath, li.rootPath)
 		}
-		delete(s.Files, relativePath)
+		delete(s.Sources, relativePath)
 	}
 }
 
 func (s *ImageSync) UpdateFile(relativePath string) {
-	if images, ok := s.Files[relativePath]; ok {
+	if images, ok := s.Sources[relativePath]; ok {
 		for _, li := range images {
 			s.clearLinkReferences(relativePath, li.rootPath)
 		}
@@ -188,12 +188,12 @@ func (s *ImageSync) UpdateFile(relativePath string) {
 // `moves` is a map of all moved files including linked files, it is used to
 // correctly replace paths if source file and its links were moved simultaneously.
 func (s *ImageSync) MoveFile(oldPath, newPath string, moves map[string]string) {
-	links, ok := s.Files[oldPath]
+	links, ok := s.Sources[oldPath]
 	if !ok {
 		return
 	}
-	s.Files[newPath] = s.Files[oldPath]
-	delete(s.Files, oldPath)
+	s.Sources[newPath] = s.Sources[oldPath]
+	delete(s.Sources, oldPath)
 	if len(links) == 0 {
 		return
 	}
@@ -251,7 +251,7 @@ func (s *ImageSync) Sync(moves map[string]string) {
 	// 1) At first, update the files that were moved and collect moved linked files
 	movedLinks := map[string]string{}
 	for from, to := range moves {
-		if _, ok := s.Files[from]; ok {
+		if _, ok := s.Sources[from]; ok {
 			s.MoveFile(from, to, moves)
 		}
 		if s.Images[from] != nil { // if linked file was moved store it in the map
@@ -281,10 +281,10 @@ func (s *ImageSync) getFilesToSync(movedLinks map[string]string) map[string][]Mo
 			if _, ok := fileMap[fpath]; ok { // already added
 				continue
 			}
-			if _, ok := s.Files[fpath]; !ok { // file doesn't exist
+			if _, ok := s.Sources[fpath]; !ok { // file doesn't exist
 				continue
 			}
-			for _, link := range s.Files[fpath] { // check every link in the file
+			for _, link := range s.Sources[fpath] { // check every link in the file
 				if linkTo, ok := movedLinks[link.rootPath]; ok {
 					// if link was moved, add file and its links to the map
 					fileMap[fpath] = append(fileMap[fpath], MovedLink{to: linkTo, link: link})
@@ -369,7 +369,7 @@ func (s ImageSync) RefsNum() int {
 }
 
 func (s ImageSync) SourcesNum() int {
-	return len(s.Files)
+	return len(s.Sources)
 }
 
 func (s *ImageSync) Scan() {
