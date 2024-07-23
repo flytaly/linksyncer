@@ -20,22 +20,29 @@ type MovedLink struct {
 	link LinkInfo
 }
 
-func GetImgsFromMD(content string) [][]string {
-	p := mdParser.New()
-	p.Parse([]byte(content))
-	_, imgs := p.LinksAndImages()
-	res := [][]string{}
-	for _, img := range imgs {
-		res = append(res, []string{string(img.GetContent()), string(img.Destination)})
-	}
-	return res
+type ContentLink struct {
+	content string
+	dest    string
 }
 
-func filterImages(paths [][]string) [][]string {
-	var result = [][]string{}
+func GetLinksFromMD(content string) (links []ContentLink, images []ContentLink) {
+	p := mdParser.New()
+	p.Parse([]byte(content))
+	links_, imgs_ := p.LinksAndImages()
+	for _, link := range links_ {
+		links = append(links, ContentLink{string(link.GetContent()), string(link.Destination)})
+	}
+	for _, img := range imgs_ {
+		images = append(images, ContentLink{string(img.GetContent()), string(img.Destination)})
+	}
+	return links, images
+}
+
+func filterLinks(paths []ContentLink) []ContentLink {
+	var result = []ContentLink{}
 
 	for _, v := range paths {
-		if strings.Contains(v[1], ":") { // probably an URL
+		if strings.Contains(v.dest, ":") { // probably an URL
 			continue
 		}
 		result = append(result, v)
@@ -52,22 +59,12 @@ func decodePath(path string) string {
 	return decoded
 }
 
-// Extracts images from a file's content. filePath argument should be absolute.
-func GetImagesFromFile(filePath string, content string) []LinkInfo {
-	var links [][]string
+func processLinks(filePath string, links []ContentLink) []LinkInfo {
+	links = filterLinks(links)
 	result := []LinkInfo{}
 
-	switch strings.ToLower(filepath.Ext(filePath)) {
-	case ".md":
-		links = GetImgsFromMD(content)
-	default:
-		return result
-	}
-
-	links = filterImages(links)
-
 	for _, l := range links {
-		link, path := l[0], l[1]
+		link, path := l.content, l.dest
 		decoded := decodePath(path)
 
 		if filepath.IsAbs(path) {
@@ -81,6 +78,20 @@ func GetImagesFromFile(filePath string, content string) []LinkInfo {
 	}
 
 	return result
+}
+
+// Extracts links from a file's content. filePath argument should be absolute.
+func GetLinksFromFile(filePath string, content string) (links []LinkInfo, images []LinkInfo) {
+	var imgList, linkList []ContentLink
+
+	switch strings.ToLower(filepath.Ext(filePath)) {
+	case ".md":
+		linkList, imgList = GetLinksFromMD(content)
+	}
+
+	links = processLinks(filePath, linkList)
+	images = processLinks(filePath, imgList)
+	return links, images
 }
 
 func ReplaceImageLinks(fPath string, fileContent []byte, imgs []MovedLink) []byte {

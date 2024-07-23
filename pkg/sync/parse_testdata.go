@@ -6,6 +6,35 @@ type imageTestCase struct {
 	md      string
 }
 
+var mdLinkCases = []imageTestCase{
+	{
+		"./subfolder/note.md",
+		"[note title](./subfolder/note.md)",
+		"[note title](./subfolder/note.md)",
+	},
+	{ // absolute path
+		"/home/user/notes/my_note.md",
+		`[my_note](/home/user/notes/my_note.md)`,
+		`[my_note](/home/user/notes/my_note.md)`,
+	},
+	{
+		"../note.md",
+		`[my_note](../note.md)`,
+		`[my_note](../note.md)`,
+	},
+	{ // nested parentheses
+		"./(notes)/note.md",
+		`[my_note](./(notes)/note.md)`,
+		`[my_note](./(notes)/note.md)`,
+	},
+	{ // ref
+		"note.md",
+		"[note1Id]: note.md",
+		`[note name][note1Id]
+[note1Id]: note.md`,
+	},
+}
+
 var mdImageCases = []imageTestCase{
 	{
 		"./assets/subfolder/image.png",

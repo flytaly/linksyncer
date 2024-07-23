@@ -80,7 +80,7 @@ func New(fileSystem fs.FS, root string, logger log.Logger, options ...func(*Imag
 	return iSync
 }
 
-var extractImages = GetImagesFromFile
+var extractLinks = GetLinksFromFile
 var writeFile = func(absPath string, data []byte) error {
 	info, err := os.Stat(absPath)
 	if err != nil {
@@ -125,7 +125,7 @@ func (s *ImageSync) AddFile(relativePath string) {
 		return
 	}
 
-	images := extractImages(relativePath, string(data))
+	_, images := extractLinks(relativePath, string(data))
 	s.saveLinks(relativePath, &images)
 }
 
@@ -233,7 +233,7 @@ func (s *ImageSync) UpdateLinksInFile(relativePath string, links []MovedLink) er
 		return err
 	}
 
-	images := extractImages(relativePath, string(updated))
+	_, images := extractLinks(relativePath, string(updated))
 	for _, link := range links {
 		s.clearLinkReferences(relativePath, link.link.rootPath)
 	}

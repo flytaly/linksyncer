@@ -29,13 +29,24 @@ func createMarkdown(basepath string, testlinks []imageTestCase) (string, []LinkI
 	return markdown, images
 }
 
-func TestGetImagesFromFile(t *testing.T) {
-	t.Run("markdown", func(t *testing.T) {
+func TestGetLinksFromFile(t *testing.T) {
+	t.Run("markdown images", func(t *testing.T) {
 		for i, testcase := range mdImageCases {
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				base := "/home/user/notes/my_notes/"
 				markdown, want := createMarkdown(base, []imageTestCase{testcase})
-				got := GetImagesFromFile(base+"note.md", markdown)
+				_, got := GetLinksFromFile(base+"note.md", markdown)
+				assert.Equal(t, want, got)
+			})
+		}
+	})
+
+	t.Run("markdown links", func(t *testing.T) {
+		for i, testcase := range mdLinkCases {
+			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+				base := "/home/user/notes/my_notes/"
+				markdown, want := createMarkdown(base, []imageTestCase{testcase})
+				got, _ := GetLinksFromFile(base+"note.md", markdown)
 				assert.Equal(t, want, got)
 			})
 		}
