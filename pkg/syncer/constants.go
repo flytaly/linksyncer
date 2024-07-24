@@ -1,4 +1,4 @@
-package sync
+package syncer
 
 var ExcludedDirs = map[string]bool{"node_modules": true}
 

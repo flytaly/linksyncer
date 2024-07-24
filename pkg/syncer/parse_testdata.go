@@ -1,4 +1,4 @@
-package sync
+package syncer
 
 type imageTestCase struct {
 	link    string

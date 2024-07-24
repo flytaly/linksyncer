@@ -13,7 +13,7 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/flytaly/imagesync/testutils"
+	"github.com/flytaly/linksyncer/testutils"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -3,7 +3,7 @@ package main
 import (
 	_ "embed"
 
-	"github.com/flytaly/imagesync/cmd"
+	"github.com/flytaly/linksyncer/cmd"
 )
 
 //go:embed version

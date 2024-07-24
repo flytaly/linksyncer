@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/flytaly/imagesync/pkg/fswatcher"
+	"github.com/flytaly/linksyncer/pkg/fswatcher"
 )
 
 func main() {

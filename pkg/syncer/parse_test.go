@@ -1,11 +1,11 @@
-package sync
+package syncer
 
 import (
 	"fmt"
 	"path/filepath"
 	"testing"
 
-	"github.com/flytaly/imagesync/testutils"
+	"github.com/flytaly/linksyncer/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -97,7 +97,7 @@ func TestReplaceImageLinks(t *testing.T) {
 			want := fmt.Sprintf("# Test markdown %d\n## Text with images\n%s\ntext after the image...", i, v.linkTo)
 
 			link := []MovedLink{{to: v.move.to, link: LinkInfo{rootPath: v.move.from, path: v.move.link, fullLink: v.linkFrom}}}
-			got := string(ReplaceImageLinks(filePath, []byte(md), link))
+			got := string(ReplaceLinks(filePath, []byte(md), link))
 			assertText(t, got, want)
 		})
 	}

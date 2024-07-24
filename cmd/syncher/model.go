@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flytaly/imagesync/pkg/log"
-	imagesync "github.com/flytaly/imagesync/pkg/sync"
+	"github.com/flytaly/linksyncer/pkg/log"
+	linksyncer "github.com/flytaly/linksyncer/pkg/syncer"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -43,7 +43,7 @@ type model struct {
 	keys         keyMap
 	help         help.Model
 	pollinterval time.Duration
-	syncer       *imagesync.ImageSync
+	syncer       *linksyncer.LinkSyncer
 	root         string
 	status       Status
 	movesChan    chan movesMsg
@@ -245,9 +245,9 @@ type ProgramCfg struct {
 
 func NewProgram(cfg ProgramCfg) *tea.Program {
 	logChannel := make(chan log.Record, logRowsTotal)
-	syncer := imagesync.New(
+	syncer := linksyncer.New(
 		os.DirFS(cfg.Root), cfg.Root, log.New(cfg.LogPath, logChannel),
-		func(s *imagesync.ImageSync) {
+		func(s *linksyncer.LinkSyncer) {
 			if cfg.MaxFileSize > 0 {
 				s.MaxFileSize = cfg.MaxFileSize
 			}

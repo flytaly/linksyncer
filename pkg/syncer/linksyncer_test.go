@@ -1,4 +1,4 @@
-package sync
+package syncer
 
 import (
 	"io/fs"
@@ -6,19 +6,19 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/flytaly/imagesync/pkg/fswatcher"
+	"github.com/flytaly/linksyncer/pkg/fswatcher"
 	"github.com/stretchr/testify/assert"
 )
 
-func NewTestISync(fs fs.FS, root string) *ImageSync {
+func NewTestISync(fs fs.FS, root string) *LinkSyncer {
 	return New(fs, root, nil)
 }
 
-func NewTestISyncWithFS(root string) (*ImageSync, fstest.MapFS) {
+func NewTestISyncWithFS(root string) (*LinkSyncer, fstest.MapFS) {
 	fs, filesWithLinks, linkedFiles := GetTestFileSys()
 	iSync := NewTestISync(fs, root)
 	iSync.Sources = filesWithLinks
-	iSync.Images = linkedFiles
+	iSync.Linked = linkedFiles
 	return iSync, fs
 }
 
@@ -42,7 +42,7 @@ func TestProcessFiles(t *testing.T) {
 	iSync := NewTestISync(mapFS, "notes")
 	_ = iSync.ProcessFiles()
 	assert.Equal(t, wantFiles, iSync.Sources)
-	assert.Equal(t, wantRefs, iSync.Images)
+	assert.Equal(t, wantRefs, iSync.Linked)
 
 	t.Run("number of files", func(t *testing.T) {
 		assert.Equal(t, iSync.SourcesNum(), len(wantFiles))
@@ -62,8 +62,8 @@ func TestRemoveFile(t *testing.T) {
 		iSync.RemoveFile(note1)
 		assert.NotContains(t, iSync.Sources, note1)
 
-		assert.NotContains(t, iSync.Images, img1)
-		assert.Equal(t, iSync.Images[img2], map[string]struct{}{note2: {}})
+		assert.NotContains(t, iSync.Linked, img1)
+		assert.Equal(t, iSync.Linked[img2], map[string]Empty{note2: {}})
 	})
 
 	t.Run("remove note 2", func(t *testing.T) {
@@ -73,8 +73,8 @@ func TestRemoveFile(t *testing.T) {
 		iSync.RemoveFile(note2)
 		assert.NotContains(t, iSync.Sources, note2)
 
-		assert.Equal(t, iSync.Images[img1], map[string]struct{}{note1: {}})
-		assert.Equal(t, iSync.Images[img2], map[string]struct{}{note1: {}})
+		assert.Equal(t, iSync.Linked[img1], map[string]Empty{note1: {}})
+		assert.Equal(t, iSync.Linked[img2], map[string]Empty{note1: {}})
 	})
 
 }
@@ -123,10 +123,10 @@ func TestMoveFile(t *testing.T) {
 	assert.NotContains(t, iSync.Sources, from, "should delete old path")
 	assert.Contains(t, iSync.Sources, to, "should add new path")
 
-	assert.NotContains(t, iSync.Images[linkedFile1], from, "should delete old reference")
-	assert.Contains(t, iSync.Images[linkedFile1], to, "should add new reference")
-	assert.NotContains(t, iSync.Images[linkedFile2], from, "should delete old reference")
-	assert.Contains(t, iSync.Images[linkedFile2], to, "should add new reference")
+	assert.NotContains(t, iSync.Linked[linkedFile1], from, "should delete old reference")
+	assert.Contains(t, iSync.Linked[linkedFile1], to, "should add new reference")
+	assert.NotContains(t, iSync.Linked[linkedFile2], from, "should delete old reference")
+	assert.Contains(t, iSync.Linked[linkedFile2], to, "should add new reference")
 
 	expected := map[string]string{
 		to: `![alt text](folder/assets/image01.png)\n![alt text](folder/assets/image02.png)`,
@@ -159,9 +159,9 @@ func TestUpdateImageLinks(t *testing.T) {
 		assert.Equal(t, want, *written, "image links in the file should be updated")
 
 		for _, img := range imgs {
-			assert.NotContains(t, iSync.Images, img.link.rootPath, "should remove old path")
-			assert.Contains(t, iSync.Images, img.to, "should add new path")
-			assert.Contains(t, iSync.Images[img.to], note, "should have reference to the source file")
+			assert.NotContains(t, iSync.Linked, img.link.rootPath, "should remove old path")
+			assert.Contains(t, iSync.Linked, img.to, "should add new path")
+			assert.Contains(t, iSync.Linked[img.to], note, "should have reference to the source file")
 		}
 
 		assert.Contains(t, iSync.Sources[note],
@@ -236,13 +236,13 @@ func TestSync(t *testing.T) {
 
 		t.Run("test linked files in cache", func(t *testing.T) {
 			for from, to := range links {
-				assert.NotContains(t, iSync.Images, from, "old path to linked files should be removed")
-				assert.Contains(t, iSync.Images, to, "new path to linked files should be saved")
+				assert.NotContains(t, iSync.Linked, from, "old path to linked files should be removed")
+				assert.Contains(t, iSync.Linked, to, "new path to linked files should be saved")
 			}
 
-			assert.Equal(t, map[string]struct{}{
+			assert.Equal(t, map[string]Empty{
 				movedNotes[0].to: {},
-			}, iSync.Images["notes/images/image01.png"])
+			}, iSync.Linked["notes/images/image01.png"])
 
 		})
 
@@ -366,7 +366,7 @@ func TestSkipFiles(t *testing.T) {
 	}
 
 	t.Run("skip files by size", func(t *testing.T) {
-		iSync := New(fs, ".", nil, func(s *ImageSync) {
+		iSync := New(fs, ".", nil, func(s *LinkSyncer) {
 			s.MaxFileSize = 2 * 1024
 		})
 		shouldSkipFn := getShouldSkipPath(iSync)
@@ -384,7 +384,7 @@ func TestSkipFiles(t *testing.T) {
 	})
 
 	t.Run("skip function should be passed to watcher", func(t *testing.T) {
-		iSync := New(fs, ".", nil, func(s *ImageSync) {
+		iSync := New(fs, ".", nil, func(s *LinkSyncer) {
 			s.MaxFileSize = 2 * 1024
 		})
 		iSync.ProcessFiles()

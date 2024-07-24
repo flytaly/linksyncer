@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	syncer "github.com/flytaly/imagesync/cmd/syncher"
+	syncer "github.com/flytaly/linksyncer/cmd/syncher"
 	"github.com/spf13/cobra"
 )
 
@@ -31,9 +31,9 @@ func getConfig(cmd *cobra.Command) syncer.ProgramCfg {
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "imagesync",
-	Short: "Syncronize image links in Markdown and HTML files",
-	Long: `Syncronize image links in Markdown and HTML files
+	Use:   "linksyncer",
+	Short: "Synchronize links in Markdown files.",
+	Long: `Synchronize links in Markdown files
 
 Launch the program in the root directory that contains note files and images.
 Use 'watch' command to watch for changes automatically.
@@ -67,7 +67,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.imagesync.yaml)")
+	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.linksyncer.yaml)")
 	rootCmd.PersistentFlags().StringP("path", "p", "", "path to the watched directory (default is the working directory)")
 	rootCmd.PersistentFlags().StringP("log", "l", "", "path to the log file")
 	rootCmd.PersistentFlags().Int64("size", 1024, "maximum file size in KB")

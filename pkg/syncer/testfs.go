@@ -1,4 +1,4 @@
-package sync
+package syncer
 
 import (
 	"testing/fstest"
@@ -69,10 +69,10 @@ var testFiles = map[string]testFile{
 	},
 }
 
-func GetTestFileSys() (fs fstest.MapFS, links map[string][]LinkInfo, wasLinked map[string]map[string]struct{}) {
+func GetTestFileSys() (fs fstest.MapFS, links map[string][]LinkInfo, wasLinked map[string]map[string]Empty) {
 	fs = make(map[string]*fstest.MapFile)
 	links = make(map[string][]LinkInfo)
-	wasLinked = make(map[string]map[string]struct{})
+	wasLinked = make(map[string]map[string]Empty)
 
 	for path, testFile := range testFiles {
 		fs[path] = testFile.mapFile
@@ -80,9 +80,9 @@ func GetTestFileSys() (fs fstest.MapFS, links map[string][]LinkInfo, wasLinked m
 			links[path] = testFile.hasLinks
 		}
 		if len(testFile.wasLinked) > 0 {
-			wasLinked[path] = map[string]struct{}{}
+			wasLinked[path] = map[string]Empty{}
 			for _, v := range testFile.wasLinked {
-				wasLinked[path][v] = struct{}{}
+				wasLinked[path][v] = Empty{}
 			}
 		}
 	}

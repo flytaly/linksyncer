@@ -1,4 +1,4 @@
-module github.com/flytaly/imagesync
+module github.com/flytaly/linksyncer
 
 go 1.21
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	syncer "github.com/flytaly/imagesync/cmd/syncher"
+	syncer "github.com/flytaly/linksyncer/cmd/syncher"
 	"github.com/spf13/cobra"
 )
 

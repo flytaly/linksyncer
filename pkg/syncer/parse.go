@@ -1,4 +1,4 @@
-package sync
+package syncer
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	mdParser "github.com/flytaly/imagesync/pkg/parser"
+	mdParser "github.com/flytaly/linksyncer/pkg/parser"
 )
 
 type LinkInfo struct {
@@ -94,24 +94,25 @@ func GetLinksFromFile(filePath string, content string) (links []LinkInfo, images
 	return links, images
 }
 
-func ReplaceImageLinks(fPath string, fileContent []byte, imgs []MovedLink) []byte {
+// ReplaceLinks updates links in the file
+func ReplaceLinks(fPath string, fileContent []byte, moves []MovedLink) []byte {
 	result := fileContent
 
-	for _, img := range imgs {
+	for _, move := range moves {
 		targpath := ""
-		if !filepath.IsAbs(img.link.path) {
-			targpath, _ = filepath.Rel(filepath.Dir(fPath), img.to)
+		if !filepath.IsAbs(move.link.path) {
+			targpath, _ = filepath.Rel(filepath.Dir(fPath), move.to)
 		}
 		if targpath == "" {
-			targpath = img.to
+			targpath = move.to
 		}
 
 		// encode spaces
 		targpath = strings.Replace(targpath, " ", "%20", -1)
 
 		// Replace path in the link and then replace link in the file
-		newLink := strings.Replace(img.link.fullLink, img.link.path, targpath, 1)
-		result = bytes.ReplaceAll(result, []byte(img.link.fullLink), []byte(newLink))
+		newLink := strings.Replace(move.link.fullLink, move.link.path, targpath, 1)
+		result = bytes.ReplaceAll(result, []byte(move.link.fullLink), []byte(newLink))
 	}
 
 	return result
