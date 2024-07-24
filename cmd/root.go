@@ -33,12 +33,13 @@ func getConfig(cmd *cobra.Command) syncer.ProgramCfg {
 var rootCmd = &cobra.Command{
 	Use:   "linksyncer",
 	Short: "Synchronize links in Markdown files.",
-	Long: `Synchronize links in Markdown files
+	Long: `Synchronize links in Markdown files.
 
 Launch the program in the root directory that contains note files and images.
-Use 'watch' command to watch for changes automatically.
 
-Internally, watcher polls the filesystem, so don't use the program inside the root directory of the filesystem or in the folders with large number of files.
+Use the "watch" command to automatically monitor for changes. 
+
+The watcher internally polls the file system, so avoid using the automatic watch mode from the root of the file system or folders containing a very large number of files.
 `,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:

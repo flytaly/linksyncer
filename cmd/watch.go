@@ -11,8 +11,8 @@ import (
 // watchCmd represents the watch command
 var watchCmd = &cobra.Command{
 	Use:   "watch",
-	Short: "Watch for changes in the current directory and update links in Markdown and HTML files",
-	Long:  `Watch for changes in the current directory and update links in Markdown and HTML files`,
+	Short: "Watch for changes in the current directory and update links in Markdown files",
+	Long:  `Watch for changes in the current directory and update links in Markdown files`,
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := getConfig(cmd)
 		p := syncer.NewProgram(cfg)
