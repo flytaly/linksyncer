@@ -212,22 +212,6 @@ func (p *Parser) fencedCodeBlock(data []byte) int {
 	return beg
 }
 
-// returns blockquote prefix length
-func (p *Parser) quotePrefix(data []byte) int {
-	i := 0
-	n := len(data)
-	for i < 3 && i < n && data[i] == ' ' {
-		i++
-	}
-	if i < n && data[i] == '>' {
-		if i+1 < n && data[i+1] == ' ' {
-			return i + 2
-		}
-		return i + 1
-	}
-	return 0
-}
-
 // returns prefix length for block code
 func (p *Parser) codePrefix(data []byte) int {
 	n := len(data)
@@ -305,12 +289,6 @@ func (p *Parser) paragraph(data []byte) int {
 		if n := IsEmpty(current); n > 0 {
 			p.renderParagraph(data[:i])
 			return i + n
-		}
-
-		// if there's a block quote, paragraph is over
-		if p.quotePrefix(current) > 0 {
-			p.renderParagraph(data[:i])
-			return i
 		}
 
 		// if there's a fenced code block, paragraph is over
